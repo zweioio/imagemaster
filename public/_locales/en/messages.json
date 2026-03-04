@@ -4,7 +4,7 @@
     "description": "The name of the application"
   },
   "appDesc": {
-    "message": "Professional image processing extension with smart compression and AI matting.",
+    "message": "Image processing tool integrating three core functions: image compression, AI matting, and format conversion. An efficient image processing extension designed for designers, developers, new media operators, and e-commerce sellers.",
     "description": "The description of the application"
   },
   "contextMenuProcess": {

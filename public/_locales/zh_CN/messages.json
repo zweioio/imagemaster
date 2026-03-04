@@ -1,10 +1,10 @@
 {
   "appName": {
-    "message": "图片编辑大师",
+    "message": "图片编辑大师 - ImageMaster",
     "description": "The name of the application"
   },
   "appDesc": {
-    "message": "专业的图片处理Chrome扩展，支持智能压缩和AI抠图。",
+    "message": "图片处理工具，集成 \"图片压缩、AI抠图、格式转换\" 三大核心功能。专为设计师、开发者、新媒体运营和电商卖家打造的高效图片处理插件",
     "description": "The description of the application"
   },
   "contextMenuProcess": {

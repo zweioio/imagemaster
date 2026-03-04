@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ImageMaster - 专业图片处理工具，一键压缩、抠图、格式转换</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #050507;
+            --bg-elevated: #0c0c10;
+            --fg: #fafafa;
+            --muted: #8b8b9e;
+            --accent: #0257FB;
+            --accent-light: #3d7fff;
+            --accent-glow: rgba(2, 87, 251, 0.4);
+            --card: rgba(18, 18, 24, 0.7);
+            --border: rgba(60, 60, 80, 0.4);
+            --glow-primary: rgba(2, 87, 251, 0.15);
+            --glow-secondary: rgba(2, 87, 251, 0.08);
+            --success: #10b981;
+            --grid-color: rgba(40, 40, 50, 0.5);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; cursor: none; }
+        body {
+            font-family: 'Noto Sans SC', 'Space Grotesk', sans-serif;
+            background: var(--bg);
+            color: var(--fg);
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+        .font-display { font-family: 'Space Grotesk', sans-serif; }
+
+        /* 自定义鼠标 */
+        .cursor-dot {
+            position: fixed;
+            width: 8px;
+            height: 8px;
+            background: var(--accent);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 10001;
+            transform: translate(-50%, -50%);
+            transition: transform 0.1s ease, width 0.2s ease, height 0.2s ease, background 0.2s ease;
+        }
+        .cursor-ring {
+            position: fixed;
+            width: 36px;
+            height: 36px;
+            border: 1.5px solid rgba(2, 87, 251, 0.6);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 10000;
+            transform: translate(-50%, -50%);
+            transition: transform 0.15s ease, width 0.25s ease, height 0.25s ease, border-color 0.2s ease;
+        }
+        .cursor-dot.clicking,
+        .cursor-ring.clicking {
+            transform: translate(-50%, -50%) scale(0.8);
+        }
+        .cursor-ring.clicking {
+            width: 28px;
+            height: 28px;
+            border-color: var(--accent);
+        }
+        .cursor-hover .cursor-ring {
+            width: 50px;
+            height: 50px;
+            border-color: var(--accent);
+            border-width: 2px;
+        }
+
+        /* 线条格子背景 */
+        .grid-background {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+        .grid-lines {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background-image: 
+                linear-gradient(var(--grid-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+            background-size: 40px 40px;
+            opacity: 0.4;
+        }
+        .grid-spotlight {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.15) 1px, transparent 1px);
+            background-size: 40px 40px;
+            -webkit-mask-image: radial-gradient(circle 360px at var(--mouse-x, 50%) var(--mouse-y, 50%), black 0%, transparent 70%);
+            mask-image: radial-gradient(circle 360px at var(--mouse-x, 50%) var(--mouse-y, 50%), black 0%, transparent 70%);
+            opacity: 1;
+            mix-blend-mode: normal;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* 顶部弥散光效 */
+        .hero-diffuse-light {
+            position: absolute;
+            top: -100px;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(2, 87, 251, 0.12) 0%, transparent 60%),
+                radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.12) 0%, transparent 60%),
+                radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.08) 0%, transparent 60%);
+            filter: blur(80px);
+            z-index: 0;
+            animation: heroGlowMove 15s ease-in-out infinite alternate;
+            pointer-events: none;
+        }
+        @keyframes heroGlowMove {
+            0% { transform: scale(1) translateY(0); opacity: 0.8; }
+            100% { transform: scale(1.1) translateY(20px); opacity: 1; }
+        }
+
+        /* 流光效果 */
+        .flow-light {
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            top: -50%;
+            left: -50%;
+            background: conic-gradient(
+                from 0deg at 50% 50%,
+                transparent 0deg,
+                rgba(2, 87, 251, 0.03) 60deg,
+                transparent 120deg,
+                rgba(139, 92, 246, 0.02) 180deg,
+                transparent 240deg,
+                rgba(16, 185, 129, 0.02) 300deg,
+                transparent 360deg
+            );
+            animation: rotateFlow 20s linear infinite;
+        }
+        @keyframes rotateFlow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .flow-mask {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 30% 30%, transparent 0%, var(--bg) 50%);
+        }
+
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.6;
+            animation: float 30s ease-in-out infinite;
+            z-index: 1;
+            pointer-events: none;
+        }
+        .orb-1 { width: 600px; height: 600px; background: radial-gradient(circle, var(--glow-primary) 0%, transparent 70%); top: 50px; right: -100px; }
+        .orb-2 { width: 400px; height: 400px; background: radial-gradient(circle, var(--glow-secondary) 0%, transparent 70%); bottom: -80px; left: -80px; animation-delay: -10s; }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            25% { transform: translate(20px, -20px) scale(1.03); }
+            50% { transform: translate(-15px, 15px) scale(0.97); }
+            75% { transform: translate(15px, 20px) scale(1.01); }
+        }
+
+        .content-layer { position: relative; z-index: 10; }
+
+        .nav-blur {
+            backdrop-filter: blur(12px);
+            background: rgba(5, 5, 7, 0.4);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .nav-link { position: relative; color: var(--muted); transition: color 0.3s ease; }
+        .nav-link::after { content: ''; position: absolute; bottom: -4px; left: 0; width: 0; height: 2px; background: var(--accent); transition: width 0.3s ease; }
+        .nav-link:hover { color: var(--fg); }
+        .nav-link:hover::after { width: 100%; }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
+            color: #fff;
+            font-weight: 600;
+            padding: 14px 32px;
+            border-radius: 10px;
+            border: none;
+            cursor: none;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-primary::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+            transition: left 0.5s ease;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 20px 40px rgba(2, 87, 251, 0.35); }
+        .btn-primary:hover::before { left: 100%; }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--fg);
+            font-weight: 500;
+            padding: 14px 32px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            cursor: none;
+            transition: all 0.3s ease;
+        }
+        .btn-secondary:hover { border-color: var(--accent); background: rgba(2, 87, 251, 0.08); }
+
+        .hero-title { font-size: clamp(2.5rem, 7vw, 4.5rem); font-weight: 700; line-height: 1.15; letter-spacing: -0.03em; }
+        .title-line { display: block; opacity: 0; transform: translateY(40px); animation: revealLine 0.8s ease forwards; }
+        .title-line:nth-child(2) { animation-delay: 0.1s; }
+        .title-line:nth-child(3) { animation-delay: 0.2s; }
+        @keyframes revealLine { to { opacity: 1; transform: translateY(0); } }
+        .text-gradient {
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 50%, #60a5fa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .product-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            backdrop-filter: blur(20px);
+            overflow: hidden;
+            transition: all 0.4s ease;
+        }
+        .product-card:hover { border-color: rgba(2, 87, 251, 0.3); transform: translateY(-8px); box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5); }
+
+        .extension-mockup {
+            background: var(--bg-elevated);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+        .extension-header { background: rgba(0, 0, 0, 0.4); padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+        .extension-body { padding: 24px; }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 12px;
+            border: 1px solid transparent;
+            transition: all 0.3s ease;
+            cursor: none;
+        }
+        .feature-item:hover { background: rgba(2, 87, 251, 0.05); border-color: rgba(2, 87, 251, 0.2); }
+        .feature-item.active { background: rgba(2, 87, 251, 0.1); border-color: var(--accent); }
+        .feature-icon-small { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+
+        .feature-card {
+            background: linear-gradient(135deg, var(--card) 0%, rgba(12, 12, 16, 0.5) 100%);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 36px;
+            transition: all 0.4s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .feature-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--accent), transparent); opacity: 0; transition: opacity 0.4s ease; }
+        .feature-card:hover::before { opacity: 1; }
+        .feature-card:hover { border-color: rgba(2, 87, 251, 0.2); transform: translateY(-4px); }
+        .feature-icon { width: 56px; height: 56px; border-radius: 14px; background: linear-gradient(135deg, rgba(2, 87, 251, 0.15) 0%, rgba(2, 87, 251, 0.05) 100%); display: flex; align-items: center; justify-content: center; margin-bottom: 24px; }
+
+        .feature-section { background: transparent; position: relative; }
+        .feature-section::before { display: none; }
+
+        .progress-bar { height: 6px; background: rgba(2, 87, 251, 0.1); border-radius: 3px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-light)); border-radius: 3px; transition: width 1s ease; }
+
+        .tag { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; }
+        .tag-blue { background: rgba(2, 87, 251, 0.1); color: var(--accent-light); border: 1px solid rgba(2, 87, 251, 0.2); }
+        .tag-green { background: rgba(16, 185, 129, 0.1); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.2); }
+        .tag-purple { background: rgba(139, 92, 246, 0.1); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.2); }
+
+        .reveal { opacity: 0; transform: translateY(30px); transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
+        .reveal.visible { opacity: 1; transform: translateY(0); }
+
+        .stat-item { text-align: center; padding: 20px; }
+        .stat-number { font-size: 2.5rem; font-weight: 700; background: linear-gradient(135deg, var(--fg) 0%, var(--muted) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+        .user-tag { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 8px; font-size: 14px; color: var(--muted); transition: all 0.3s ease; }
+        .user-tag:hover { border-color: var(--accent); color: var(--fg); background: rgba(2, 87, 251, 0.05); }
+
+        .footer-link { color: var(--muted); transition: color 0.3s ease; }
+        .footer-link:hover { color: var(--accent-light); }
+
+        @media (max-width: 768px) {
+            .hero-title { font-size: 2.25rem; }
+            .orb { opacity: 0.2; }
+            .stat-number { font-size: 1.75rem; }
+            .feature-card { padding: 24px; }
+            .cursor-dot, .cursor-ring { display: none; }
+            html { cursor: auto; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+        }
+
+        :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+        .processing-animation { display: flex; align-items: center; gap: 8px; }
+        .processing-dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; animation: processingPulse 1.4s ease-in-out infinite; }
+        .processing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .processing-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes processingPulse { 0%, 100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.2); } }
+
+        .step-indicator { display: flex; align-items: center; gap: 4px; }
+        .step-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); transition: all 0.3s ease; }
+        .step-dot.active { background: var(--accent); box-shadow: 0 0 10px var(--accent-glow); }
+
+        .faq-item { background: var(--card); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; transition: all 0.3s ease; }
+        .faq-item:hover { border-color: rgba(2, 87, 251, 0.2); }
+        .faq-question { width: 100%; padding: 20px 24px; background: transparent; border: none; color: var(--fg); font-size: 16px; font-weight: 500; text-align: left; cursor: none; display: flex; justify-content: space-between; align-items: center; transition: background 0.3s ease; }
+        .faq-question:hover { background: rgba(255, 255, 255, 0.02); }
+        .faq-icon { width: 24px; height: 24px; border-radius: 50%; background: rgba(2, 87, 251, 0.1); display: flex; align-items: center; justify-content: center; transition: transform 0.3s ease, background 0.3s ease; flex-shrink: 0; margin-left: 16px; }
+        .faq-item.open .faq-icon { transform: rotate(45deg); background: var(--accent); }
+        .faq-answer { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+        .faq-answer-inner { padding: 0 24px 20px; color: var(--muted); font-size: 15px; line-height: 1.7; }
+        .faq-item.open .faq-answer { max-height: 300px; }
+
+        .testimonial-card {
+            background: linear-gradient(135deg, var(--card) 0%, rgba(12, 12, 16, 0.5) 100%);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 28px;
+            transition: border-color 0.4s ease, box-shadow 0.4s ease;
+            position: relative;
+            overflow: hidden;
+            flex-shrink: 0;
+            width: 380px;
+        }
+        .testimonial-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--card-accent, var(--accent)); border-radius: 20px 20px 0 0; opacity: 0; transition: opacity 0.4s ease; }
+        .testimonial-card:hover::before { opacity: 1; }
+        .testimonial-card:hover { border-color: rgba(2, 87, 251, 0.2); box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3); }
+        .testimonial-card.designer { --card-accent: #a78bfa; }
+        .testimonial-card.developer { --card-accent: #0257FB; }
+        .testimonial-card.marketer { --card-accent: #34d399; }
+        .testimonial-card.ecommerce { --card-accent: #fbbf24; }
+        .testimonial-avatar { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 18px; position: relative; }
+        .testimonial-avatar::after { content: ''; position: absolute; inset: -2px; border-radius: 50%; background: linear-gradient(135deg, var(--card-accent, var(--accent)) 0%, transparent 100%); z-index: -1; opacity: 0.5; }
+        .testimonial-card.designer .testimonial-avatar { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
+        .testimonial-card.developer .testimonial-avatar { background: rgba(2, 87, 251, 0.15); color: #3d7fff; }
+        .testimonial-card.marketer .testimonial-avatar { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+        .testimonial-card.ecommerce .testimonial-avatar { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+        .star-rating { display: flex; gap: 2px; }
+        .star-rating svg { width: 14px; height: 14px; }
+
+        .testimonial-scroll-container {
+            overflow: hidden;
+            position: relative;
+            padding: 0 60px;
+        }
+        .testimonial-scroll-container::before,
+        .testimonial-scroll-container::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 180px;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .testimonial-scroll-container::before {
+            left: 0;
+            background: linear-gradient(90deg, var(--bg) 0%, var(--bg) 30%, transparent 100%);
+        }
+        .testimonial-scroll-container::after {
+            right: 0;
+            background: linear-gradient(-90deg, var(--bg) 0%, var(--bg) 30%, transparent 100%);
+        }
+        .testimonial-scroll-track {
+            display: flex;
+            gap: 24px;
+            animation: scrollLeft 50s linear infinite;
+            width: max-content;
+        }
+        .testimonial-scroll-container:hover .testimonial-scroll-track {
+            animation-play-state: paused;
+        }
+        @keyframes scrollLeft {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+
+        /* 使用教程 - 2024 高级版 */
+         .tutorial-card {
+             position: relative;
+             background: linear-gradient(135deg, var(--card) 0%, rgba(12, 12, 16, 0.5) 100%);
+             border: 1px solid var(--border);
+             border-radius: 20px;
+             padding: 40px 32px;
+             text-align: center;
+             transition: all 0.4s ease;
+             overflow: hidden;
+             height: 100%;
+         }
+         .tutorial-card::before {
+             content: '';
+             position: absolute;
+             top: 0; left: 0; right: 0;
+             height: 1px;
+             background: linear-gradient(90deg, transparent, var(--accent), transparent);
+             opacity: 0;
+             transition: opacity 0.4s ease;
+         }
+         .tutorial-card:hover {
+             transform: translateY(-4px);
+             border-color: rgba(2, 87, 251, 0.2);
+         }
+         .tutorial-card:hover::before { opacity: 1; }
+         
+         .tutorial-icon-box {
+             width: 56px; height: 56px;
+             border-radius: 14px;
+             background: linear-gradient(135deg, rgba(2, 87, 251, 0.15) 0%, rgba(2, 87, 251, 0.05) 100%);
+             display: flex;
+             align-items: center;
+             justify-content: center;
+             margin: 0 auto 24px;
+             transition: all 0.4s ease;
+             position: relative;
+             z-index: 1;
+             border: none;
+         }
+         .tutorial-card:hover .tutorial-icon-box {
+             transform: scale(1.1) rotate(6deg);
+             box-shadow: 0 10px 20px rgba(2, 87, 251, 0.1);
+         }
+         .tutorial-icon-box svg {
+             width: 28px; height: 28px;
+             color: inherit;
+             transition: all 0.3s ease;
+         }
+         .tutorial-card:hover .tutorial-icon-box svg { color: white; }
+
+         .step-number {
+             position: absolute;
+             top: 10px; right: 20px;
+             font-family: 'Space Grotesk', sans-serif;
+             font-size: 80px;
+             font-weight: 700;
+             color: rgba(255, 255, 255, 0.02);
+             line-height: 1;
+             transition: all 0.4s ease;
+             pointer-events: none;
+             z-index: 0;
+         }
+         .tutorial-card:hover .step-number {
+             color: rgba(2, 87, 251, 0.06);
+             transform: scale(1.1) translateX(-5px);
+         }
+
+        @media (max-width: 768px) {
+            .tutorial-grid { grid-template-columns: 1fr; }
+            .tutorial-step::before {
+                width: 50%;
+                height: 1px;
+                right: 25%;
+                top: auto;
+                bottom: 0;
+            }
+            .tutorial-number-bg { font-size: 72px; }
+            .tutorial-number { font-size: 36px; }
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 6px;
+            background: rgba(2, 87, 251, 0.2);
+            border-radius: 3px;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: var(--accent);
+            border-radius: 50%;
+            cursor: none;
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: var(--accent);
+            border-radius: 50%;
+            border: none;
+            cursor: none;
+        }
+
+        .format-btn {
+            padding: 10px 16px;
+            font-size: 13px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.02);
+            color: var(--muted);
+            cursor: none;
+            transition: all 0.2s ease;
+        }
+        .format-btn:hover { border-color: var(--accent); color: var(--fg); }
+        .format-btn.active { background: rgba(2, 87, 251, 0.15); border-color: var(--accent); color: var(--accent-light); }
+
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            cursor: none;
+            transition: background 0.3s ease;
+        }
+        .toggle-switch.active { background: var(--accent); }
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+        }
+        .toggle-switch.active::after { transform: translateX(20px); }
+
+        /* 图片对比滑块 */
+        .image-compare {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 4/3;
+            border-radius: 12px;
+            overflow: hidden;
+            cursor: none;
+            background: linear-gradient(135deg, #1a1a24 0%, #0c0c10 100%);
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .image-compare-before,
+        .image-compare-after {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        .image-compare-before {
+            clip-path: inset(0 50% 0 0);
+        }
+        .compare-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            -webkit-user-drag: none;
+            user-drag: none;
+        }
+        .image-compare-slider {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 3px;
+            background: linear-gradient(180deg, transparent 0%, #3d3d4d 10%, #3d3d4d 90%, transparent 100%);
+            transform: translateX(-50%);
+            z-index: 10;
+        }
+        .image-compare-slider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            background: #1a1a24;
+            border: 2px solid #3d3d4d;
+            border-radius: 50%;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+        }
+        .image-compare-slider::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 18px;
+            height: 18px;
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23666676' stroke-width='2'%3E%3Cpath d='M18 8L22 12L18 16'/%3E%3Cpath d='M6 8L2 12L6 16'/%3E%3C/svg%3E") no-repeat center;
+            background-size: contain;
+            z-index: 1;
+        }
+        .compare-label {
+            position: absolute;
+            bottom: 12px;
+            padding: 6px 14px;
+            background: rgba(10, 10, 14, 0.85);
+            border: 1px solid #2a2a34;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            z-index: 5;
+            color: var(--muted);
+        }
+        .compare-label-before { left: 12px; }
+        .compare-label-after { right: 12px; }
+    </style>
+</head>
+<body>
+    <!-- 顶部弥散光效 -->
+    <!-- <div class="hero-diffuse-light"></div> -->
+
+    <!-- 光球 -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+
+    <!-- 自定义鼠标 -->
+    <div class="cursor-dot" id="cursorDot"></div>
+    <div class="cursor-ring" id="cursorRing"></div>
+
+    <!-- 线条格子背景 -->
+    <div class="grid-background">
+        <div class="grid-lines"></div>
+        <!-- 移动 grid-spotlight 到 body 直接子元素，确保不被父级 z-index 限制 -->
+    </div>
+    <div class="grid-spotlight" id="gridSpotlight"></div>
+
+    <div class="fixed inset-0 pointer-events-none z-0" style="overflow: hidden;">
+        <div class="flow-light"></div>
+        <div class="flow-mask"></div>
+    </div>
+
+    <!-- 修复：将光球移出 fixed 容器，或确保其层级正确 -->
+    <!-- div class="orb orb-1"></div>
+    <div class="orb orb-2"></div -->
+
+    <div class="content-layer">
+        <!-- 导航 -->
+        <nav class="nav-blur fixed top-0 left-0 right-0 z-50">
+            <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <img src="logo.svg" alt="ImageMaster" style="height: 32px; width: auto;">
+                </div>
+                <div class="hidden md:flex items-center gap-8">
+                    <a href="#features" class="nav-link text-sm">核心功能</a>
+                    <a href="#why-us" class="nav-link text-sm">为什么选择我们</a>
+                    <a href="#compression" class="nav-link text-sm">图片压缩</a>
+                    <a href="#ai-matting" class="nav-link text-sm">AI抠图</a>
+                    <a href="#tutorial" class="nav-link text-sm">使用教程</a>
+                    <a href="#faq" class="nav-link text-sm">常见问题</a>
+                </div>
+                <div class="flex items-center gap-3">
+                    <a href="https://chrome.google.com/webstore" target="_blank" class="btn-primary text-sm flex items-center gap-2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        <span>下载插件</span>
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Hero -->
+        <section class="min-h-screen flex items-center pt-20">
+            <div class="max-w-7xl mx-auto px-6 py-20">
+                <div class="grid lg:grid-cols-2 gap-16 items-center">
+                    <div>
+                        <div class="flex flex-wrap gap-2 mb-8">
+                            <span class="tag tag-blue"><span class="w-1.5 h-1.5 rounded-full bg-current"></span>Chrome 插件</span>
+                            <span class="tag tag-green"><span class="w-1.5 h-1.5 rounded-full bg-current animate-pulse"></span>免费使用</span>
+                        </div>
+                        <h1 class="hero-title font-display mb-6">
+                            <span class="title-line">专业图片处理</span>
+                            <span class="title-line"><span class="text-gradient">一键搞定</span></span>
+                        </h1>
+                        <p class="text-lg text-zinc-400 mb-8 max-w-lg leading-relaxed opacity-0 animate-[revealLine_0.8s_ease_0.4s_forwards]">
+                            ImageMaster 是一款强大的 Chrome 浏览器插件，集成图片压缩、AI抠图、格式转换三大核心功能。本地 AI 大模型保障数据安全，设计师、开发者、运营必备工具。
+                        </p>
+                        <div class="flex flex-wrap gap-2 mb-10 opacity-0 animate-[revealLine_0.8s_ease_0.45s_forwards]">
+                            <span class="user-tag"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>设计师</span>
+                            <span class="user-tag"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>开发者</span>
+                            <span class="user-tag"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>产品经理</span>
+                            <span class="user-tag"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>运营</span>
+                            <span class="user-tag"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>电商</span>
+                        </div>
+                        <div class="flex flex-wrap gap-4 opacity-0 animate-[revealLine_0.8s_ease_0.5s_forwards]">
+                            <button class="btn-primary flex items-center gap-2">
+                                <span>免费安装使用</span>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                            </button>
+                            <button class="btn-secondary flex items-center gap-2" onclick="document.getElementById('features').scrollIntoView({behavior:'smooth'})">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                                <span>核心功能</span>
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4 mt-16 opacity-0 animate-[revealLine_0.8s_ease_0.6s_forwards]">
+                            <div class="stat-item"><div class="stat-number font-display">100K+</div><div class="text-sm text-zinc-500">活跃用户</div></div>
+                            <div class="stat-item"><div class="stat-number font-display">5M+</div><div class="text-sm text-zinc-500">图片处理</div></div>
+                            <div class="stat-item"><div class="stat-number font-display">100%</div><div class="text-sm text-zinc-500">免费使用</div></div>
+                        </div>
+                    </div>
+                    <div class="product-card p-1 opacity-0 animate-[revealLine_0.8s_ease_0.3s_forwards]">
+                        <div class="extension-mockup">
+                            <div class="extension-header">
+                                <div class="flex items-center gap-3">
+                                    <span class="font-medium">ImageMaster</span>
+                                </div>
+                                <span class="text-xs text-zinc-500">v1.0.0</span>
+                            </div>
+                            <div class="extension-body">
+                                <div class="space-y-3" id="featureList">
+                                    <div class="feature-item active" data-feature="compress">
+                                        <div class="feature-icon-small bg-gradient-to-br from-[#0257FB]/20 to-[#0257FB]/5">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0257FB" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                        </div>
+                                        <div class="flex-1"><div class="font-medium text-sm">图片压缩</div><div class="text-xs text-zinc-500">智能压缩 80% 体积</div></div>
+                                        <span class="tag tag-blue text-xs">热门</span>
+                                    </div>
+                                    <div class="feature-item" data-feature="matting">
+                                        <div class="feature-icon-small bg-gradient-to-br from-purple-500/20 to-purple-500/5">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><path d="M20.24 12.24a6 6 0 00-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/></svg>
+                                        </div>
+                                        <div class="flex-1"><div class="font-medium text-sm">AI抠图</div><div class="text-xs text-zinc-500">本地模型 安全快速</div></div>
+                                        <span class="tag tag-purple text-xs">AI</span>
+                                    </div>
+                                    <div class="feature-item" data-feature="convert">
+                                        <div class="feature-icon-small bg-gradient-to-br from-emerald-500/20 to-emerald-500/5">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                        </div>
+                                        <div class="flex-1"><div class="font-medium text-sm">格式转换</div><div class="text-xs text-zinc-500">PNG/JPG/WebP</div></div>
+                                    </div>
+                                </div>
+                                <div class="mt-6 p-4 bg-zinc-900/50 rounded-xl border border-zinc-800">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <span class="text-sm text-zinc-400">处理进度</span>
+                                        <span class="text-sm font-medium text-[#0257FB]" id="progressText">准备就绪</span>
+                                    </div>
+                                    <div class="progress-bar"><div class="progress-fill" id="progressBar" style="width: 0%"></div></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 核心功能 -->
+        <section id="features" class="py-32">
+            <div class="max-w-7xl mx-auto px-6">
+                <div class="text-center mb-20 reveal">
+                    <span class="tag tag-blue mb-4">核心功能</span>
+                    <h2 class="font-display text-4xl md:text-5xl font-bold mb-6">三大功能，<span class="text-gradient">一站解决</span></h2>
+                    <p class="text-zinc-400 max-w-2xl mx-auto">无需多个工具切换，ImageMaster 为您提供完整的图片处理解决方案</p>
+                </div>
+                <div class="grid md:grid-cols-3 gap-6">
+                    <div class="feature-card reveal" style="transition-delay: 0.1s;">
+                        <div class="feature-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0257FB" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+                        <h3 class="font-display text-xl font-semibold mb-3">智能压缩</h3>
+                        <p class="text-zinc-400 text-sm leading-relaxed mb-4">AI 智能识别图片内容，在保持画质的同时大幅减小体积。支持 JPEG、PNG、WebP 等主流格式，压缩率高达 80%。</p>
+                        <ul class="space-y-2 text-sm text-zinc-500">
+                            <li class="flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0257FB" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>批量处理</li>
+                            <li class="flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0257FB" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>质量可调</li>
+                            <li class="flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0257FB" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>实时预览</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card reveal" style="transition-delay: 0.2s;">
+                        <div class="feature-icon" style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%);"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><path d="M20.24 12.24a6 6 0 00-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/></svg></div>
+                        <h3 class="font-display text-xl font-semibold mb-3">AI 抠图</h3>
+                        <p class="text-zinc-400 text-sm leading-relaxed mb-4">基于本地 AI 大模型，精准识别前景背景。无需上传图片到服务器，数据安全有保障，处理速度快。</p>
+                        <ul class="space-y-2 text-sm text-zinc-500">
+                            <li class="flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>本地处理</li>
+                            <li class="flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>毫秒级响应</li>
+                            <li class="flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>边缘优化</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card reveal" style="transition-delay: 0.3s;">
+                        <div class="feature-icon" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+                        <h3 class="font-display text-xl font-semibold mb-3">格式转换</h3>
+                        <p class="text-zinc-400 text-sm leading-relaxed mb-4">支持 PNG、JPG、WebP 等多种格式互转。一键转换，满足不同场景的格式需求。</p>
+                        <ul class="space-y-2 text-sm text-zinc-500">
+                            <li class="flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>多格式支持</li>
+                            <li class="flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>批量转换</li>
+                            <li class="flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>质量保持</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 为什么选择我们 -->
+        <section id="why-us" class="py-32 feature-section">
+            <div class="max-w-7xl mx-auto px-6">
+                <div class="text-center mb-20 reveal">
+                    <span class="tag tag-green mb-4">优势</span>
+                    <h2 class="font-display text-4xl md:text-5xl font-bold mb-6">为什么选择 <span class="text-gradient">ImageMaster</span></h2>
+                    <p class="text-zinc-400 max-w-2xl mx-auto">我们深知专业人士的需求，每一个细节都为提升效率而生</p>
+                </div>
+                <div class="grid md:grid-cols-2 gap-8">
+                    <div class="feature-card reveal" style="transition-delay: 0.1s;">
+                        <div class="flex items-start gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-[#0257FB]/10 flex items-center justify-center flex-shrink-0"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0257FB" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div>
+                            <div><h3 class="font-display text-lg font-semibold mb-2">数据安全，本地处理</h3><p class="text-zinc-400 text-sm leading-relaxed">AI 抠图功能完全在本地运行，无需上传图片到服务器。您的图片数据永远不会离开您的设备。</p></div>
+                        </div>
+                    </div>
+                    <div class="feature-card reveal" style="transition-delay: 0.2s;">
+                        <div class="flex items-start gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M6 12l4 4 8-8"/></svg></div>
+                            <div><h3 class="font-display text-lg font-semibold mb-2">完全免费，持续更新</h3><p class="text-zinc-400 text-sm leading-relaxed">个人版永久免费，无隐藏收费。我们持续迭代优化，为您带来更好的使用体验。</p></div>
+                        </div>
+                    </div>
+                    <div class="feature-card reveal" style="transition-delay: 0.3s;">
+                        <div class="flex items-start gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center flex-shrink-0"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+                            <div><h3 class="font-display text-lg font-semibold mb-2">极速处理，效率翻倍</h3><p class="text-zinc-400 text-sm leading-relaxed">基于 WebAssembly 和本地 AI 模型，处理速度远超在线工具。批量处理功能让您的工作效率倍增。</p></div>
+                        </div>
+                    </div>
+                    <div class="feature-card reveal" style="transition-delay: 0.4s;">
+                        <div class="flex items-start gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg></div>
+                            <div><h3 class="font-display text-lg font-semibold mb-2">简单易用，即开即用</h3><p class="text-zinc-400 text-sm leading-relaxed">安装插件后，右键即可使用所有功能。无需注册账号，无需复杂配置，开箱即用。</p></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 图片压缩详情 -->
+        <section id="compression" class="py-32">
+            <div class="max-w-7xl mx-auto px-6">
+                <div class="grid lg:grid-cols-2 gap-16 items-center">
+                    <div class="reveal">
+                        <span class="tag tag-blue mb-4">图片压缩</span>
+                        <h2 class="font-display text-4xl md:text-5xl font-bold mb-6">智能压缩<br/><span class="text-gradient">体积减小 80%</span></h2>
+                        <p class="text-zinc-400 mb-8 leading-relaxed">我们的智能压缩算法能够识别图片中的重要区域，在保持视觉质量的同时大幅减小文件体积。</p>
+                        <div class="space-y-6">
+                            <div>
+                                <div class="flex justify-between mb-2"><span class="text-sm text-zinc-400">原始大小</span><span class="text-sm font-medium">2.4 MB</span></div>
+                                <div class="progress-bar"><div class="progress-fill" style="width: 100%"></div></div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between mb-2"><span class="text-sm text-zinc-400">压缩后</span><span class="text-sm font-medium text-[#0257FB]">480 KB</span></div>
+                                <div class="progress-bar"><div class="progress-fill" style="width: 20%; background: linear-gradient(90deg, #34d399, #10b981);"></div></div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4 mt-8 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl info-card">
+                            <div class="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+                            <div><div class="font-medium text-sm text-emerald-400">画质无损</div><div class="text-xs text-zinc-500">智能算法保留关键细节</div></div>
+                        </div>
+                    </div>
+                    <div class="reveal" style="transition-delay: 0.2s;">
+                        <div class="product-card p-6">
+                            <div class="extension-mockup">
+                                <div class="extension-header"><span class="text-sm font-medium">压缩设置</span></div>
+                                <div class="extension-body">
+                                    <div class="space-y-5">
+                                        <div>
+                                            <label class="text-sm text-zinc-400 mb-3 block">压缩质量</label>
+                                            <input type="range" min="10" max="100" value="80" class="w-full" id="qualitySlider">
+                                            <div class="flex justify-between text-xs text-zinc-500 mt-2"><span>更小体积</span><span id="qualityValue">80%</span><span>更高质量</span></div>
+                                        </div>
+                                        <div>
+                                            <label class="text-sm text-zinc-400 mb-3 block">输出格式</label>
+                                            <div class="grid grid-cols-3 gap-2">
+                                                <button class="format-btn active" data-format="jpeg">JPEG</button>
+                                                <button class="format-btn" data-format="png">PNG</button>
+                                                <button class="format-btn" data-format="webp">WebP</button>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center justify-between p-3 bg-zinc-800/30 rounded-lg">
+                                            <span class="text-sm text-zinc-400">保持元数据</span>
+                                            <div class="toggle-switch active" id="metadataToggle"></div>
+                                        </div>
+                                        <button class="btn-primary w-full">开始压缩</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- AI 抠图详情 -->
+        <section id="ai-matting" class="py-32 feature-section">
+            <div class="max-w-7xl mx-auto px-6">
+                <div class="grid lg:grid-cols-2 gap-16 items-center">
+                    <div class="order-2 lg:order-1 reveal">
+                        <div class="product-card p-6">
+                            <div class="extension-mockup">
+                                <div class="extension-header"><span class="text-sm font-medium">AI 抠图预览</span><div class="step-indicator"><span class="step-dot active"></span><span class="step-dot"></span><span class="step-dot"></span></div></div>
+                                <div class="extension-body">
+                                    <div class="image-compare" id="imageCompare">
+                                        <div class="image-compare-after" style="background-image: linear-gradient(45deg, #1a1a1a 25%, transparent 25%), linear-gradient(-45deg, #1a1a1a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1a1a1a 75%), linear-gradient(-45deg, transparent 75%, #1a1a1a 75%); background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0px; background-color: #0f0f0f;">
+                                            <img src="matting-processed.png" alt="抠图后" class="compare-img">
+                                        </div>
+                                        <div class="image-compare-before" id="compareBefore">
+                                            <img src="matting-original.png" alt="原图" class="compare-img">
+                                        </div>
+                                        <div class="image-compare-slider" id="compareSlider"></div>
+                                        <span class="compare-label compare-label-before">原图</span>
+                                        <span class="compare-label compare-label-after">抠图后</span>
+                                    </div>
+                                    <div class="grid grid-cols-3 gap-2 mt-4">
+                                        <div class="p-3 bg-zinc-800/50 rounded-lg text-center"><div class="text-lg font-display font-bold text-[#0257FB]">0.8s</div><div class="text-xs text-zinc-500">处理时间</div></div>
+                                        <div class="p-3 bg-zinc-800/50 rounded-lg text-center"><div class="text-lg font-display font-bold text-emerald-400">98%</div><div class="text-xs text-zinc-500">边缘精度</div></div>
+                                        <div class="p-3 bg-zinc-800/50 rounded-lg text-center"><div class="text-lg font-display font-bold text-purple-400">100%</div><div class="text-xs text-zinc-500">本地处理</div></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="order-1 lg:order-2 reveal" style="transition-delay: 0.1s;">
+                        <span class="tag tag-purple mb-4">AI 抠图</span>
+                        <h2 class="font-display text-4xl md:text-5xl font-bold mb-6">本地 AI<br/><span class="text-gradient">安全快速抠图</span></h2>
+                        <p class="text-zinc-400 mb-8 leading-relaxed">基于先进的深度学习模型，ImageMaster 的 AI 抠图功能完全在您的浏览器本地运行。</p>
+                        <div class="space-y-4 mb-8">
+                            <div class="flex items-center gap-3 text-zinc-300"><span class="w-6 h-6 rounded-full bg-purple-500/20 flex items-center justify-center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>本地 AI 大模型，数据不出设备</div>
+                            <div class="flex items-center gap-3 text-zinc-300"><span class="w-6 h-6 rounded-full bg-purple-500/20 flex items-center justify-center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>智能识别人物、商品、动物等主体</div>
+                            <div class="flex items-center gap-3 text-zinc-300"><span class="w-6 h-6 rounded-full bg-purple-500/20 flex items-center justify-center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>边缘羽化处理，自然过渡</div>
+                            <div class="flex items-center gap-3 text-zinc-300"><span class="w-6 h-6 rounded-full bg-purple-500/20 flex items-center justify-center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>支持透明背景导出</div>
+                        </div>
+                        <div class="flex items-center gap-4 p-4 bg-purple-500/5 border border-purple-500/20 rounded-xl info-card">
+                            <div class="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div>
+                            <div><div class="font-medium text-sm text-purple-400">隐私优先</div><div class="text-xs text-zinc-500">所有处理均在本地完成</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 使用教程 -->
+        <section id="tutorial" class="py-32 relative">
+            <!-- 背景光效 -->
+            <!-- <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[300px] bg-blue-500/10 blur-[100px] rounded-full pointer-events-none z-0"></div> -->
+            
+            <div class="max-w-7xl mx-auto px-6 relative z-10">
+                <div class="text-center mb-20 reveal">
+                    <span class="tag tag-blue mb-4">使用指南</span>
+                    <h2 class="font-display text-4xl md:text-5xl font-bold mb-6">轻松上手，<span class="text-gradient">仅需三步</span></h2>
+                    <p class="text-zinc-400 max-w-2xl mx-auto">零学习成本，像使用系统原生功能一样简单自然</p>
+                </div>
+                
+                <div class="grid md:grid-cols-3 gap-8 relative">
+                    <!-- Step 1 -->
+                    <div class="tutorial-card reveal" style="transition-delay: 0.1s;">
+                        <span class="step-number">01</span>
+                        <div class="tutorial-icon-box" style="background: linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(251, 191, 36, 0.05) 100%);">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        </div>
+                        <h3 class="font-display text-xl font-bold mb-3">一键安装</h3>
+                        <p class="text-zinc-400 text-sm leading-relaxed">访问 Chrome 应用商店，点击"添加到 Chrome"，即可将 ImageMaster 集成到您的浏览器中。</p>
+                    </div>
+                    
+                    <!-- Step 2 -->
+                    <div class="tutorial-card reveal" style="transition-delay: 0.2s;">
+                        <span class="step-number">02</span>
+                        <div class="tutorial-icon-box" style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%);">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
+                        </div>
+                        <h3 class="font-display text-xl font-bold mb-3">右键选择</h3>
+                        <p class="text-zinc-400 text-sm leading-relaxed">在网页上的任意图片上点击鼠标右键，在菜单中选择"ImageMaster"，然后点击您需要的功能。</p>
+                    </div>
+                    
+                    <!-- Step 3 -->
+                    <div class="tutorial-card reveal" style="transition-delay: 0.3s;">
+                        <span class="step-number">03</span>
+                        <div class="tutorial-icon-box" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                        </div>
+                        <h3 class="font-display text-xl font-bold mb-3">即刻完成</h3>
+                        <p class="text-zinc-400 text-sm leading-relaxed">处理将在毫秒级内完成。预览满意后，一键保存到本地。全程无需上传，安全高效。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 用户评价滚动 -->
+        <section id="testimonials" class="py-32 feature-section">
+            <div class="max-w-7xl mx-auto px-6">
+                <div class="text-center mb-16 reveal">
+                    <span class="tag tag-purple mb-4">用户评价</span>
+                    <h2 class="font-display text-4xl md:text-5xl font-bold mb-6">来自真实用户的<span class="text-gradient">好评</span></h2>
+                    <p class="text-zinc-400 max-w-2xl mx-auto">超过 100,000 名专业人士选择 ImageMaster</p>
+                </div>
+                <div class="testimonial-scroll-container reveal" style="transition-delay: 0.1s;">
+                    <div class="testimonial-scroll-track" id="testimonialTrack">
+                        <div class="testimonial-card designer">
+                            <div class="flex items-center gap-3 mb-4"><div class="testimonial-avatar">L</div><div><div class="font-medium">林小云</div><div class="text-sm text-zinc-500">UI 设计师 · 字节跳动</div></div></div>
+                            <div class="star-rating mb-3"><svg viewBox="0 0 24 24" fill="#a78bfa"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg viewBox="0 0 24 24" fill="#a78bfa"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg viewBox="0 0 24 24" fill="#a78bfa"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg viewBox="0 0 24 24" fill="#a78bfa"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg viewBox="0 0 24 24" fill="#a78bfa"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+                            <p class="text-zinc-300 text-sm leading-relaxed">"作为设计师，每天要处理大量素材。AI 抠图功能太惊艳了，边缘处理自然，比付费工具还好用！"</p>
+                        </div>
+                        <div class="testimonial-card developer">
+                            <div class="flex items-center gap-3 mb-4"><div class="testimonial-avatar">Z</div><div><div class="font-medium">张明远</div><div class="text-sm text-zinc-500">前端开发 · 阿里巴巴</div></div></div>
+                            <div class="star-rating mb-3"><svg viewBox="0 0 24 24" fill="#0257FB"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg viewBox="0 0 24 24" fill="#0257FB"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg viewBox="0 0 24 24" fill="#0257FB"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg viewBox="0 0 24 24" fill="#0257FB"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg viewBox="0 0 24 24" fill="#0257FB"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+                            <p class="text-zinc-300 text-sm leading-relaxed">"网站优化必备！图片压缩功能太实用了，批量处理节省了大量时间。本地处理让我很放心。"</p>
+                        </div>
+                        <div class="testimonial-card marketer">
+                            <div class="flex items-center gap-3 mb-4"><div class="testimonial-avatar">W</div><div><div class="font-medium">王思琪</div><div class="text-sm text-zinc-500">新媒体运营 · 小红书</div></div></div>
+                            <div class="star-rating mb-3"><svg viewBox="0 0 24 24" fill="#34d399"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg viewBox="0 0 24 24" fill="#34d399"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg viewBox="0 0 24 24" fill="#34d399"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg viewBox="0 0 24 24" fill="#34d399"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg viewBox="0 0 24 24" fill="#34d399"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+                            <p class="text-zinc-300 text-sm leading-relaxed">"每天要发布大量内容，这个插件帮我节省了至少 2 小时/天，压缩后画质几乎看不出差别！"</p>
+                        </div>
+                        <div class="testimonial-card ecommerce">
+                            <div class="flex items-center gap-3 mb-4"><div class="testimonial-avatar">C</div><div><div class="font-medium">陈建国</div><div class="text-sm text-zinc-500">电商运营 · 淘宝皇冠店</div></div></div>
+                            <div class="star-rating mb-3"><svg viewBox="0 0 24 24" fill="#fbbf24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg viewBox="0 0 24 24" fill="#fbbf24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg viewBox="0 0 24 24" fill="#fbbf24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg viewBox="0 0 24 24" fill="#fbbf24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg viewBox="0 0 24 24" fill="#fbbf24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+                            <p class="text-zinc-300 text-sm leading-relaxed">"商品图处理是电商的痛点，AI 抠图一键去除背景，省去了外包修图的钱。"</p>
+                        </div>
+                        <div class="testimonial-card developer">
+                            <div class="flex items-center gap-3 mb-4"><div class="testimonial-avatar">L</div><div><div class="font-medium">李文博</div><div class="text-sm text-zinc-500">产品经理 · 腾讯</div></div></div>
+                            <div class="star-rating mb-3"><svg viewBox="0 0 24 24" fill="#0257FB"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg viewBox="0 0 24 24" fill="#0257FB"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg viewBox="0 0 24 24" fill="#0257FB"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg viewBox="0 0 24 24" fill="#0257FB"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg viewBox="0 0 24 24" fill="#0257FB"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+                            <p class="text-zinc-300 text-sm leading-relaxed">"产品文档里的配图经常需要压缩，现在右键就能搞定，效率提升明显。"</p>
+                        </div>
+                        <div class="testimonial-card marketer">
+                            <div class="flex items-center gap-3 mb-4"><div class="testimonial-avatar">S</div><div><div class="font-medium">孙悦</div><div class="text-sm text-zinc-500">自媒体博主 · 抖音百万粉</div></div></div>
+                            <div class="star-rating mb-3"><svg viewBox="0 0 24 24" fill="#34d399"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg viewBox="0 0 24 24" fill="#34d399"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg viewBox="0 0 24 24" fill="#34d399"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg viewBox="0 0 24 24" fill="#34d399"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg viewBox="0 0 24 24" fill="#34d399"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+                            <p class="text-zinc-300 text-sm leading-relaxed">"做视频封面和配图超方便，不用再打开 PS 了。压缩后上传速度也快很多！"</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 定价 -->
+        <section id="pricing" class="py-32">
+            <div class="max-w-7xl mx-auto px-6">
+                <div class="text-center mb-20 reveal">
+                    <span class="tag tag-green mb-4">定价</span>
+                    <h2 class="font-display text-4xl md:text-5xl font-bold mb-6">简单透明的<span class="text-gradient">定价</span></h2>
+                    <p class="text-zinc-400 max-w-2xl mx-auto">个人版永久免费，专业版即将推出</p>
+                </div>
+                <div class="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                    <div class="feature-card reveal border-emerald-500/30" style="transition-delay: 0.1s;">
+                        <div class="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-emerald-500 to-transparent"></div>
+                        <div class="mb-6"><span class="inline-block px-3 py-1 text-xs bg-emerald-500/20 text-emerald-400 rounded-full mb-3">当前可用</span><h3 class="font-display text-2xl font-semibold mb-2">个人版</h3><p class="text-zinc-500 text-sm">适合个人用户日常使用</p></div>
+                        <div class="mb-6"><span class="text-5xl font-display font-bold">免费</span><span class="text-zinc-500">/永久</span></div>
+                        <ul class="space-y-3 mb-8">
+                            <li class="flex items-center gap-2 text-zinc-300 text-sm"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>图片压缩（无限制）</li>
+                            <li class="flex items-center gap-2 text-zinc-300 text-sm"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>AI 抠图（无限制）</li>
+                            <li class="flex items-center gap-2 text-zinc-300 text-sm"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>格式转换（无限制）</li>
+                            <li class="flex items-center gap-2 text-zinc-300 text-sm"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>批量处理</li>
+                            <li class="flex items-center gap-2 text-zinc-300 text-sm"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>社区支持</li>
+                        </ul>
+                        <button class="btn-primary w-full">立即安装</button>
+                    </div>
+                    <div class="feature-card reveal opacity-80" style="transition-delay: 0.2s;">
+                        <div class="mb-6"><span class="inline-block px-3 py-1 text-xs bg-zinc-700 text-zinc-400 rounded-full mb-3">即将推出</span><h3 class="font-display text-2xl font-semibold mb-2">专业版</h3><p class="text-zinc-500 text-sm">适合团队和企业用户</p></div>
+                        <div class="mb-6"><span class="text-5xl font-display font-bold text-zinc-500">敬请期待</span></div>
+                        <ul class="space-y-3 mb-8">
+                            <li class="flex items-center gap-2 text-zinc-500 text-sm"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>个人版所有功能</li>
+                            <li class="flex items-center gap-2 text-zinc-500 text-sm"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>高级 AI 模型</li>
+                            <li class="flex items-center gap-2 text-zinc-500 text-sm"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>团队协作</li>
+                            <li class="flex items-center gap-2 text-zinc-500 text-sm"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>API 接口</li>
+                            <li class="flex items-center gap-2 text-zinc-500 text-sm"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>优先技术支持</li>
+                        </ul>
+                        <button class="btn-secondary w-full" disabled>即将推出</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FAQ -->
+        <section id="faq" class="py-32">
+            <div class="max-w-3xl mx-auto px-6">
+                <div class="text-center mb-16 reveal">
+                    <span class="tag tag-purple mb-4">FAQ</span>
+                    <h2 class="font-display text-4xl md:text-5xl font-bold mb-6">常见<span class="text-gradient">问题</span></h2>
+                    <p class="text-zinc-400 max-w-2xl mx-auto">有疑问？这里可能有您需要的答案</p>
+                </div>
+                <div class="space-y-4">
+                    <div class="faq-item reveal" style="transition-delay: 0.1s;">
+                        <button class="faq-question"><span>ImageMaster 是完全免费的吗？</span><span class="faq-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span></button>
+                        <div class="faq-answer"><div class="faq-answer-inner">是的，ImageMaster 个人版完全免费，没有任何隐藏收费或功能限制。您可以无限制使用图片压缩、AI抠图和格式转换三大核心功能。</div></div>
+                    </div>
+                    <div class="faq-item reveal" style="transition-delay: 0.15s;">
+                        <button class="faq-question"><span>AI 抠图会上传我的图片吗？</span><span class="faq-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span></button>
+                        <div class="faq-answer"><div class="faq-answer-inner">绝对不会。我们的 AI 抠图功能完全在您的浏览器本地运行，使用先进的 WebAssembly 和本地 AI 模型技术。您的图片数据永远不会离开您的设备。</div></div>
+                    </div>
+                    <div class="faq-item reveal" style="transition-delay: 0.2s;">
+                        <button class="faq-question"><span>支持哪些图片格式？</span><span class="faq-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span></button>
+                        <div class="faq-answer"><div class="faq-answer-inner">ImageMaster 支持主流图片格式，包括 JPEG、PNG、WebP、GIF 等。您可以在这些格式之间自由转换。</div></div>
+                    </div>
+                    <div class="faq-item reveal" style="transition-delay: 0.25s;">
+                        <button class="faq-question"><span>除了 Chrome 还支持其他浏览器吗？</span><span class="faq-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span></button>
+                        <div class="faq-answer"><div class="faq-answer-inner">除了 Google Chrome，ImageMaster 还支持所有基于 Chromium 内核的浏览器，包括 Microsoft Edge、Arc、Brave、Vivaldi 等。</div></div>
+                    </div>
+                    <div class="faq-item reveal" style="transition-delay: 0.3s;">
+                        <button class="faq-question"><span>处理后的图片质量如何？</span><span class="faq-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span></button>
+                        <div class="faq-answer"><div class="faq-answer-inner">我们的智能压缩算法会在保持视觉质量的前提下最大程度减小文件体积。AI 抠图采用先进的边缘羽化技术，确保抠图结果边缘自然平滑。</div></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA -->
+        <section class="py-32">
+            <div class="max-w-4xl mx-auto px-6 text-center reveal">
+                <h2 class="font-display text-4xl md:text-5xl font-bold mb-6">开始使用 <span class="text-gradient">ImageMaster</span></h2>
+                <p class="text-zinc-400 mb-10 max-w-2xl mx-auto">安装 Chrome 插件，立即体验专业的图片处理能力。永久免费，无需注册。</p>
+                <div class="flex flex-wrap justify-center gap-4">
+                    <button class="btn-primary text-lg px-8 py-4 flex items-center gap-3">
+                        添加到 Chrome
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                    </button>
+                </div>
+                <p class="text-zinc-500 text-sm mt-4">支持 Chrome、Edge、Arc 等浏览器</p>
+            </div>
+        </section>
+
+        <!-- 页脚 -->
+        <footer class="border-t border-zinc-800/50 py-16">
+            <div class="max-w-7xl mx-auto px-6">
+                <div class="grid md:grid-cols-4 gap-12 mb-12">
+                    <div>
+                        <div class="flex items-center gap-3 mb-4">
+                            <img src="logo.svg" alt="ImageMaster" style="height: 24px; width: auto;">
+                        </div>
+                        <p class="text-zinc-500 text-sm">专业图片处理工具<br/>压缩、抠图、格式转换</p>
+                    </div>
+                    <div><h4 class="font-semibold mb-4">产品</h4><ul class="space-y-2"><li><a href="#features" class="footer-link text-sm">核心功能</a></li><li><a href="#compression" class="footer-link text-sm">图片压缩</a></li><li><a href="#ai-matting" class="footer-link text-sm">AI 抠图</a></li><li><a href="#pricing" class="footer-link text-sm">定价</a></li></ul></div>
+                    <div><h4 class="font-semibold mb-4">支持</h4><ul class="space-y-2"><li><a href="#tutorial" class="footer-link text-sm">使用教程</a></li><li><a href="#faq" class="footer-link text-sm">常见问题</a></li><li><a href="#testimonials" class="footer-link text-sm">用户评价</a></li></ul></div>
+                    <div><h4 class="font-semibold mb-4">法律</h4><ul class="space-y-2"><li><a href="privacy.html" class="footer-link text-sm">隐私政策</a></li><li><a href="#" class="footer-link text-sm">服务条款</a></li></ul></div>
+                </div>
+                <div class="border-t border-zinc-800/50 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+                    <p class="text-zinc-500 text-sm">2024 ImageMaster. All rights reserved.</p>
+                    <div class="flex gap-4">
+                        <a href="#" class="text-zinc-500 hover:text-[#0257FB] transition-colors" aria-label="Twitter"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>
+                        <a href="#" class="text-zinc-500 hover:text-[#0257FB] transition-colors" aria-label="GitHub"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg></a>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // 自定义鼠标
+        const cursorDot = document.getElementById('cursorDot');
+        const cursorRing = document.getElementById('cursorRing');
+        const gridSpotlight = document.getElementById('gridSpotlight');
+        const featureList = document.getElementById('featureList');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const qualitySlider = document.getElementById('qualitySlider');
+        const qualityValue = document.getElementById('qualityValue');
+        const metadataToggle = document.getElementById('metadataToggle');
+        const testimonialTrack = document.getElementById('testimonialTrack');
+        
+        let mouseX = 0, mouseY = 0, currentX = 0, currentY = 0;
+
+        const isMobile = window.matchMedia('(max-width: 768px)').matches;
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        // 鼠标移动
+        if (!isMobile && !prefersReducedMotion) {
+            document.addEventListener('mousemove', (e) => {
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+                
+                cursorDot.style.left = mouseX + 'px';
+                cursorDot.style.top = mouseY + 'px';
+                
+                // 检测是否在交互元素上
+                const target = e.target;
+                const isHover = target.closest('a, button, .feature-item, .format-btn, .toggle-switch, .nav-link, .btn-primary, .btn-secondary, .testimonial-card, .faq-question, .image-compare, .tutorial-step');
+                
+                if (isHover) {
+                    document.body.classList.add('cursor-hover');
+                } else {
+                    document.body.classList.remove('cursor-hover');
+                }
+                
+                // 网格高亮位置
+                const xPercent = (e.clientX / window.innerWidth) * 100;
+                const yPercent = (e.clientY / window.innerHeight) * 100;
+                gridSpotlight.style.setProperty('--mouse-x', xPercent + '%');
+                gridSpotlight.style.setProperty('--mouse-y', yPercent + '%');
+            });
+
+            // 点击效果
+            document.addEventListener('mousedown', () => {
+                cursorDot.classList.add('clicking');
+                cursorRing.classList.add('clicking');
+            });
+            
+            document.addEventListener('mouseup', () => {
+                cursorDot.classList.remove('clicking');
+                cursorRing.classList.remove('clicking');
+            });
+
+            // 圆圈跟随动画
+            function animateCursor() {
+                const ease = 0.15;
+                currentX += (mouseX - currentX) * ease;
+                currentY += (mouseY - currentY) * ease;
+                
+                cursorRing.style.left = currentX + 'px';
+                cursorRing.style.top = currentY + 'px';
+                
+                requestAnimationFrame(animateCursor);
+            }
+            animateCursor();
+        } else {
+            cursorDot.style.display = 'none';
+            cursorRing.style.display = 'none';
+            html.style.cursor = 'auto';
+        }
+
+        // 滚动显示
+        const observer = new IntersectionObserver((entries) => { entries.forEach(entry => { if (entry.isIntersecting) entry.target.classList.add('visible'); }); }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+        document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+        if (featureList) {
+            const featureItems = featureList.querySelectorAll('.feature-item');
+            featureItems.forEach(item => {
+                item.addEventListener('click', () => {
+                    featureItems.forEach(i => i.classList.remove('active'));
+                    item.classList.add('active');
+                    if (progressBar && progressText) { progressBar.style.width = '0%'; progressText.textContent = '处理中...'; setTimeout(() => { progressBar.style.width = '100%'; progressText.textContent = '完成'; }, 800); }
+                });
+            });
+        }
+
+        if (qualitySlider && qualityValue) { qualitySlider.addEventListener('input', () => { qualityValue.textContent = qualitySlider.value + '%'; }); }
+
+        document.querySelectorAll('.format-btn').forEach(btn => { btn.addEventListener('click', () => { document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); }); });
+
+        if (metadataToggle) { metadataToggle.addEventListener('click', () => { metadataToggle.classList.toggle('active'); }); }
+
+        document.querySelectorAll('.faq-question').forEach(button => { button.addEventListener('click', () => { const faqItem = button.parentElement; document.querySelectorAll('.faq-item.open').forEach(item => { if (item !== faqItem) item.classList.remove('open'); }); faqItem.classList.toggle('open'); }); });
+
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => { anchor.addEventListener('click', function (e) { e.preventDefault(); const target = document.querySelector(this.getAttribute('href')); if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' }); }); });
+
+        const nav = document.querySelector('nav');
+        if (nav) { window.addEventListener('scroll', () => { nav.style.boxShadow = window.pageYOffset > 100 ? '0 4px 30px rgba(0, 0, 0, 0.4)' : 'none'; }); }
+
+        document.querySelectorAll('.btn-primary, .btn-secondary').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                if (this.disabled) return;
+                const rect = this.getBoundingClientRect();
+                const ripple = document.createElement('span');
+                ripple.style.cssText = `position:absolute;background:rgba(255,255,255,0.3);border-radius:50%;pointer-events:none;width:100px;height:100px;left:${e.clientX-rect.left-50}px;top:${e.clientY-rect.top-50}px;transform:scale(0);animation:ripple 0.6s ease-out;`;
+                this.style.position = 'relative';
+                this.style.overflow = 'hidden';
+                this.appendChild(ripple);
+                setTimeout(() => ripple.remove(), 600);
+            });
+        });
+
+        const style = document.createElement('style');
+        style.textContent = '@keyframes ripple{to{transform:scale(4);opacity:0;}}';
+        document.head.appendChild(style);
+
+        setTimeout(() => { if (progressText) progressText.textContent = '准备就绪'; }, 500);
+
+        // 复制评价卡片
+        if (testimonialTrack) {
+            const cards = testimonialTrack.innerHTML;
+            testimonialTrack.innerHTML = cards + cards;
+        }
+
+        // 图片对比滑块
+        const imageCompare = document.getElementById('imageCompare');
+        const compareSlider = document.getElementById('compareSlider');
+        const compareBefore = document.getElementById('compareBefore');
+        
+        if (imageCompare && compareSlider && compareBefore) {
+            let isDragging = false;
+            
+            const updateSlider = (x) => {
+                const rect = imageCompare.getBoundingClientRect();
+                let percent = ((x - rect.left) / rect.width) * 100;
+                percent = Math.max(0, Math.min(100, percent));
+                compareSlider.style.left = percent + '%';
+                compareBefore.style.clipPath = `inset(0 ${100 - percent}% 0 0)`;
+            };
+            
+            imageCompare.addEventListener('mousedown', (e) => { 
+                e.preventDefault(); // 防止选中文字或图片
+                isDragging = true; 
+                updateSlider(e.clientX); 
+            });
+            
+            document.addEventListener('mousemove', (e) => { 
+                if (isDragging) {
+                    e.preventDefault();
+                    updateSlider(e.clientX); 
+                }
+            });
+            
+            document.addEventListener('mouseup', () => { isDragging = false; });
+            imageCompare.addEventListener('touchstart', (e) => { isDragging = true; updateSlider(e.touches[0].clientX); });
+            imageCompare.addEventListener('touchmove', (e) => { if (isDragging) updateSlider(e.touches[0].clientX); });
+            imageCompare.addEventListener('touchend', () => { isDragging = false; });
+        }
+    </script>
+</body>
+</html>

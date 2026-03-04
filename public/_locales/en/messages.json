@@ -1,0 +1,14 @@
+{
+  "appName": {
+    "message": "ImageMaster",
+    "description": "The name of the application"
+  },
+  "appDesc": {
+    "message": "Professional image processing extension with smart compression and AI matting.",
+    "description": "The description of the application"
+  },
+  "contextMenuProcess": {
+    "message": "Process with ImageMaster",
+    "description": "Context menu item to process image"
+  }
+}

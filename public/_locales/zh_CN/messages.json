@@ -1,0 +1,14 @@
+{
+  "appName": {
+    "message": "图片编辑大师",
+    "description": "The name of the application"
+  },
+  "appDesc": {
+    "message": "专业的图片处理Chrome扩展，支持智能压缩和AI抠图。",
+    "description": "The description of the application"
+  },
+  "contextMenuProcess": {
+    "message": "使用 图片编辑大师 处理",
+    "description": "Context menu item to process image"
+  }
+}

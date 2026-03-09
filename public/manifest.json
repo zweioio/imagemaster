@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "__MSG_appName__",
   "short_name": "__MSG_appName__",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "default_locale": "en",
   "description": "__MSG_appDesc__",
   "icons": {
@@ -28,13 +28,9 @@
   "permissions": [
     "activeTab",
     "contextMenus",
-    "scripting",
     "storage",
     "sidePanel",
     "clipboardRead"
-  ],
-  "host_permissions": [
-    "<all_urls>"
   ],
   "sandbox": {
     "pages": [

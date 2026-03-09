@@ -71,6 +71,7 @@ export default {
   clipboardNoImage: "No image in clipboard.",
   clipboardError: "Cannot read clipboard. Try Ctrl+V.",
   batchLimit: "Max 20 images supported. First 20 selected.",
+  batchGifWarning: "Batch processing does not support GIF format. GIF files have been filtered out. Please process GIFs individually.",
 
   // Popup
   popupCompress: "Compression",

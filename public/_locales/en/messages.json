@@ -4,7 +4,7 @@
     "description": "The name of the application"
   },
   "appDesc": {
-    "message": "Image processing tool integrating three core functions: image compression, AI matting, and format conversion. An efficient image processing extension designed for designers, developers, new media operators, and e-commerce sellers.",
+    "message": "Free image tool with 3 core functions: compression, AI matting, format conversion. Batch processing, real-time preview.",
     "description": "The description of the application"
   },
   "contextMenuProcess": {

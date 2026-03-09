@@ -413,10 +413,19 @@ const Sidebar = () => {
     const combinedFiles = isAppending ? [...originalFiles, ...files] : files;
     
     // Limit to 20 files
-    const validFiles = combinedFiles.slice(0, 20);
+    let validFiles = combinedFiles.slice(0, 20);
     if (combinedFiles.length > 20) {
       alert(t.batchLimit);
     }
+
+    // Check for GIF in batch
+    if (validFiles.length > 1 && validFiles.some(f => f.type === 'image/gif')) {
+        alert(t.batchGifWarning);
+        // Filter out GIFs from batch
+        validFiles = validFiles.filter(f => f.type !== 'image/gif');
+    }
+
+    if (validFiles.length === 0) return;
 
     setOriginalFiles(validFiles);
     

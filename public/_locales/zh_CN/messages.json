@@ -4,7 +4,7 @@
     "description": "The name of the application"
   },
   "appDesc": {
-    "message": "图片处理工具，集成 \"图片压缩、AI抠图、格式转换\" 三大核心功能。专为设计师、开发者、新媒体运营和电商卖家打造的高效图片处理插件",
+    "message": "免费且专业的图片处理处理工具，集成 \"图片压缩、AI抠图、格式转换\" 三大核心功能。批量处理、实时预览、本地运行",
     "description": "The description of the application"
   },
   "contextMenuProcess": {

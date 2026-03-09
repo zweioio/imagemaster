@@ -344,12 +344,11 @@ const modelsDir = new URL('models/', window.location.href).href;
 // 强制指定所有变体都使用本地的 sim.wasm (因为它是最通用的)
 // 使用 any 绕过类型检查，因为我们需要覆盖所有可能的请求
 (ort.env.wasm as any).wasmPaths = {
-  'ort-wasm.wasm': modelsDir + 'ort-wasm-simd.wasm',
+  'ort-wasm.wasm': modelsDir + 'ort-wasm.wasm',
   'ort-wasm-simd.wasm': modelsDir + 'ort-wasm-simd.wasm',
-  'ort-wasm-threaded.wasm': modelsDir + 'ort-wasm-simd.wasm',
+  // Fallback for threaded versions to non-threaded since we don't ship threaded wasm
+  'ort-wasm-threaded.wasm': modelsDir + 'ort-wasm.wasm', 
   'ort-wasm-simd-threaded.wasm': modelsDir + 'ort-wasm-simd.wasm',
-  // 关键：对于 .mjs 请求，我们也指向 wasm 文件（虽然加载会失败，但可能绕过某些检测）
-  // 或者直接不提供 .mjs 映射，希望它回退
 };
 
 // 彻底禁用多线程和 WebGPU，防止它去请求 .jsep.mjs 或 .threaded.wasm

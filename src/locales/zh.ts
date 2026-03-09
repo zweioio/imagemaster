@@ -71,6 +71,7 @@ export default {
   clipboardNoImage: "剪贴板中没有图片，请先复制图片后再试。",
   clipboardError: "无法直接读取剪贴板（可能需要授权）。您可以直接使用 Ctrl+V 或右键粘贴。",
   batchLimit: "最多支持批量上传 20 张图片，已自动截取前 20 张。",
+  batchGifWarning: "批量处理暂不支持 GIF 格式，已自动过滤 GIF 文件。如需处理 GIF，请单独上传。",
 
   // Popup
   popupCompress: "图片压缩",

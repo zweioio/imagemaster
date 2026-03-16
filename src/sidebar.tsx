@@ -87,7 +87,7 @@ const Sidebar = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sandboxIframeRef = useRef<HTMLIFrameElement>(null);
   const [mattingFormat, setMattingFormat] = useState<'image/png' | 'image/jpeg'>('image/png');
-  const [mattingModel, setMattingModel] = useState<'rmbg14' | 'u2net'>('rmbg14');
+  const [mattingModel, setMattingModel] = useState<'rmbg14' | 'u2net' | 'birefnet'>('birefnet');
   const loadingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // 稿定风格配色常量
@@ -1388,6 +1388,26 @@ const Sidebar = () => {
                        
                        <div style={{ display: 'flex', gap: '8px' }}>
                       <button
+                        onClick={() => setMattingModel('birefnet')}
+                        style={{
+                          flex: 1,
+                          padding: '8px',
+                          borderRadius: '6px',
+                          border: `1px solid ${mattingModel === 'birefnet' ? COLORS.brand : '#d9d9d9'}`,
+                          backgroundColor: mattingModel === 'birefnet' ? '#e6f7ff' : '#fff',
+                          color: mattingModel === 'birefnet' ? COLORS.brand : COLORS.textMain,
+                          fontSize: '13px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <span style={{ fontWeight: 500 }}>BiRefNet</span>
+                      </button>
+                      <button
                         onClick={() => setMattingModel('rmbg14')}
                         style={{
                           flex: 1,
@@ -1431,7 +1451,7 @@ const Sidebar = () => {
                     </div>
 
                     <div style={{ marginTop: '8px', fontSize: '11px', color: COLORS.textCaption }}>
-                        {mattingModel === 'rmbg14' ? t.modelRmbgDesc : t.modelU2netDesc}
+                        {mattingModel === 'birefnet' ? t.modelBirefnetDesc : (mattingModel === 'rmbg14' ? t.modelRmbgDesc : t.modelU2netDesc)}
                     </div>
                   </div>
                   

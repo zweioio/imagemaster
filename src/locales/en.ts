@@ -45,6 +45,7 @@ export default {
   aiModelDesc: "Auto remove background",
   modelRmbgDesc: "General / Fast: Good for most cases, fast speed.",
   modelU2netDesc: "High Precision: Large model (~170MB), slow first load. WiFi recommended.",
+  modelBirefnetDesc: "High Quality / Slower: BiRefNet gives cleaner edges and better details, but runs slower. Best for quality-focused use.",
   startMatting: "Start Matting",
   
   // Result

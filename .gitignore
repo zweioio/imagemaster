@@ -2,5 +2,7 @@ node_modules
 dist
 .DS_Store
 _legacy_backup
+artifacts
 public/models/u2net.onnx
 imagemaster.zip
+public/models/BiRefNet*.onnx

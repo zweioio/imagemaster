@@ -357,7 +357,7 @@ ort.env.wasm.proxy = false;
 ort.env.wasm.simd = true; // 明确启用 SIMD (我们有 simd.wasm)
 
 let session: ort.InferenceSession | null = null;
-let loadedModelType: 'rmbg14' | 'u2net' | null = null; // 记录当前加载的模型类型
+let loadedModelType: 'rmbg14' | 'u2net' | 'birefnet' | null = null; // 记录当前加载的模型类型
 let lastOutputTensor: ort.Tensor | null = null;
 let lastOriginalImage: HTMLImageElement | null = null;
 
@@ -368,13 +368,29 @@ const REMOTE_MODELS = {
 };
 
 // 获取模型路径 (支持本地优先，远程兜底)
-const getModelUrl = async (type: 'rmbg14' | 'u2net'): Promise<string> => {
-  const localFileName = type === 'u2net' ? 'u2net.onnx' : 'rmbg-1.4.onnx';
+const getModelUrl = async (type: 'rmbg14' | 'u2net' | 'birefnet'): Promise<string> => {
+  const localFileName =
+    type === 'u2net'
+      ? 'u2net.onnx'
+      : type === 'birefnet'
+        ? 'BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx'
+        : 'rmbg-1.4.onnx';
   const localUrl = modelsDir + localFileName;
 
   // 对于 RMBG-1.4，总是使用本地文件
   if (type === 'rmbg14') {
       return localUrl;
+  }
+
+  if (type === 'birefnet') {
+    try {
+      const response = await fetch(localUrl, { method: 'HEAD' });
+      if (response.ok) {
+        return localUrl;
+      }
+    } catch (e) {
+    }
+    throw new Error('BiRefNet model file not found. Please put BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx into public/models/.');
   }
 
   // 对于大模型 U2Net，检查本地是否存在
@@ -397,7 +413,7 @@ const getModelUrl = async (type: 'rmbg14' | 'u2net'): Promise<string> => {
 };
 
 // 预加载模型
-async function loadModel(modelType: 'rmbg14' | 'u2net' = 'rmbg14') {
+async function loadModel(modelType: 'rmbg14' | 'u2net' | 'birefnet' = 'rmbg14') {
   if (session && loadedModelType === modelType) {
     return session;
   }
@@ -433,7 +449,7 @@ async function loadModel(modelType: 'rmbg14' | 'u2net' = 'rmbg14') {
 }
 
 // 图像处理辅助函数
-async function processImage(imageFile: { arrayBuffer: ArrayBuffer, type: string }, modelType: 'rmbg14' | 'u2net'): Promise<{ original: HTMLImageElement, tensor: ort.Tensor }> {
+async function processImage(imageFile: { arrayBuffer: ArrayBuffer, type: string }, modelType: 'rmbg14' | 'u2net' | 'birefnet'): Promise<{ original: HTMLImageElement, tensor: ort.Tensor }> {
   // 1. 加载图像
   const blob = new Blob([imageFile.arrayBuffer], { type: imageFile.type });
   const url = URL.createObjectURL(blob);
@@ -461,7 +477,7 @@ async function processImage(imageFile: { arrayBuffer: ArrayBuffer, type: string 
 
   const float32Data = new Float32Array(3 * width * height);
 
-  if (modelType === 'u2net') {
+  if (modelType !== 'rmbg14') {
       // U2Net Normalization (ImageNet)
       // mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
       const mean = [0.485, 0.456, 0.406];
@@ -493,22 +509,23 @@ async function processImage(imageFile: { arrayBuffer: ArrayBuffer, type: string 
 }
 
 // 应用抠图后处理
-const applyMatting = async (output: ort.Tensor, original: HTMLImageElement, modelType: 'rmbg14' | 'u2net' = 'rmbg14') => {
+const applyMatting = async (output: ort.Tensor, original: HTMLImageElement, modelType: 'rmbg14' | 'u2net' | 'birefnet' = 'rmbg14') => {
   try {
     const maskData = output.data as Float32Array; 
     
-    let maskSize = 1024;
-    if (modelType === 'u2net') {
-        maskSize = 320;
-    }
+    const dims = output.dims || [];
+    const maybeH = dims.length >= 2 ? dims[dims.length - 2] : undefined;
+    const maybeW = dims.length >= 1 ? dims[dims.length - 1] : undefined;
+    const maskHeight = typeof maybeH === 'number' ? maybeH : (modelType === 'u2net' ? 320 : 1024);
+    const maskWidth = typeof maybeW === 'number' ? maybeW : (modelType === 'u2net' ? 320 : 1024);
     
     const maskCanvas = document.createElement('canvas');
-    maskCanvas.width = maskSize;
-    maskCanvas.height = maskSize;
+    maskCanvas.width = maskWidth;
+    maskCanvas.height = maskHeight;
     const maskCtx = maskCanvas.getContext('2d');
     if (!maskCtx) throw new Error('Mask canvas context unavailable');
     
-    const maskImgData = maskCtx.createImageData(maskSize, maskSize);
+    const maskImgData = maskCtx.createImageData(maskWidth, maskHeight);
 
     // Check value range to determine if Sigmoid is needed
     // u2netp output is usually logits, but sometimes ONNX export includes sigmoid.
@@ -816,7 +833,7 @@ window.addEventListener('message', async (event) => {
     // 2. Handle Normal Request (Requires imageFile)
     if (payload.imageFile) {
       try {
-        const requestedModel = payload.model || 'rmbg14';
+        const requestedModel: 'rmbg14' | 'u2net' | 'birefnet' = payload.model || 'rmbg14';
 
         // 检查是否需要重新加载模型
         if (!session || loadedModelType !== requestedModel) {
@@ -828,14 +845,9 @@ window.addEventListener('message', async (event) => {
             }
             
             console.log(`Sandbox: Switching model to ${requestedModel}...`);
-            
-            // Map external model name to internal filename/type if needed
-            let internalModelType: 'rmbg14' | 'u2net' = 'rmbg14';
-            if (requestedModel === 'u2net') internalModelType = 'u2net';
-            
-            // Load new model
-            session = await loadModel(internalModelType);
-            loadedModelType = internalModelType;
+
+            session = await loadModel(requestedModel);
+            loadedModelType = requestedModel;
         }
 
         window.parent.postMessage({ type: 'MATTING_PROGRESS', payload: { progress: 30 } }, '*');

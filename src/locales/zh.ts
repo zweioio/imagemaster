@@ -45,6 +45,7 @@ export default {
   aiModelDesc: "自动识别主体并去除背景",
   modelRmbgDesc: "通用 / 快速：适合大多数场景，速度快，边缘处理自然，适合简单场景",
   modelU2netDesc: "高精度 / 大模型：U2Net 模型较大 (约170MB)，首次加载慢，细节更丰富。建议在 Wi-Fi 下使用",
+  modelBirefnetDesc: "高质量 / 更慢：BiRefNet 模型更精细，边缘更自然，但处理更慢，适合对质量要求高的场景",
   startMatting: "开始抠图",
   
   // Result

@@ -64,6 +64,8 @@ export default {
   
   // Errors & Alerts
   mattingError: "Matting Failed",
+  mattingErrorGeneral: "Please try again later, or switch to RMBG-1.4 model.",
+  mattingErrorMemory: "This may be caused by insufficient memory. Close other tabs/apps, or switch to RMBG-1.4 and try again.",
   mattingErrorNetwork: "Please check your network connection.",
   mattingGifError: "AI Matting does not support GIF.",
   mattingWebpError: "AI Matting does not support Animated WebP.",

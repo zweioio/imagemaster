@@ -64,6 +64,8 @@ export default {
   
   // Errors & Alerts
   mattingError: "AI 抠图失败",
+  mattingErrorGeneral: "请稍后重试，或切换到 RMBG-1.4 模型。",
+  mattingErrorMemory: "可能是内存不足导致。建议关闭其他标签页，或切换到 RMBG-1.4 再试。",
   mattingErrorNetwork: "请确保网络连接正常（可能需要魔法）。",
   mattingGifError: "AI 抠图不支持 GIF 动图，请上传静态图片。",
   mattingWebpError: "AI 抠图不支持 WebP 动图，请上传静态图片。",

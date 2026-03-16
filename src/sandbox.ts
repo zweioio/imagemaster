@@ -866,7 +866,23 @@ window.addEventListener('message', async (event) => {
         // Add a small delay to allow UI to update to 50%
         await new Promise(resolve => setTimeout(resolve, 50));
         
-        const results = await session.run(feeds);
+        let results: Record<string, ort.Tensor> | null = null;
+        try {
+          results = await session.run(feeds);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          const isOom = msg.includes('std::bad_alloc') || msg.includes('bad_alloc') || msg.includes('OOM') || msg.includes('out of memory');
+          if (isOom && loadedModelType === 'birefnet') {
+            loadedModelType = 'rmbg14';
+            session = await loadModel('rmbg14');
+            const fallbackInput = await processImage(payload.imageFile, 'rmbg14');
+            const fallbackFeeds = { [session.inputNames[0]]: fallbackInput.tensor };
+            const fallback = await session.run(fallbackFeeds);
+            results = fallback;
+          } else {
+            throw e;
+          }
+        }
         const output = results[session.outputNames[0]];
         lastOutputTensor = output; // 保存推理结果
 

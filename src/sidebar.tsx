@@ -87,7 +87,7 @@ const Sidebar = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sandboxIframeRef = useRef<HTMLIFrameElement>(null);
   const [mattingFormat, setMattingFormat] = useState<'image/png' | 'image/jpeg'>('image/png');
-  const [mattingModel, setMattingModel] = useState<'rmbg14' | 'u2net' | 'birefnet'>('birefnet');
+  const [mattingModel, setMattingModel] = useState<'rmbg14' | 'u2net' | 'birefnet'>('rmbg14');
   const loadingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // 稿定风格配色常量
@@ -252,7 +252,18 @@ const Sidebar = () => {
         console.error('AI 抠图失败:', payload.message);
         setProcessing(false);
         if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
-        alert(`${t.mattingError}: ${payload.message}。${t.mattingErrorNetwork}`);
+        const msg = String(payload.message || '');
+        const isOom = msg.includes('std::bad_alloc') || msg.includes('bad_alloc') || msg.includes('OOM') || msg.includes('out of memory');
+        const isNetwork =
+          msg.includes('Failed to fetch') ||
+          msg.includes('NetworkError') ||
+          msg.includes('ERR_NETWORK') ||
+          msg.includes('ERR_INTERNET_DISCONNECTED') ||
+          msg.includes('CORS') ||
+          msg.includes('403') ||
+          msg.includes('429');
+        const hint = isOom ? t.mattingErrorMemory : (isNetwork ? t.mattingErrorNetwork : t.mattingErrorGeneral);
+        alert(`${t.mattingError}: ${msg}。${hint}`);
       } else if (type === 'MATTING_PROGRESS') {
         if (isCancelled) return;
         setMattingProgress(payload.progress);

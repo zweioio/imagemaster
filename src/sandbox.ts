@@ -434,10 +434,57 @@ async function loadModel(modelType: 'rmbg14' | 'u2net' | 'birefnet' = 'rmbg14') 
     console.log(`Loading model: ${modelType} from ${modelUrl}`);
     
     // Create new session
-    session = await ort.InferenceSession.create(modelUrl, {
-      executionProviders: ['wasm'], // Force WASM
+    const prefersWebgpu = modelType === 'birefnet' && typeof (navigator as any).gpu !== 'undefined';
+    const sessionOptions: any = {
+      executionProviders: prefersWebgpu ? ['webgpu', 'wasm'] : ['wasm'],
       graphOptimizationLevel: 'all'
-    });
+    };
+    if (modelType === 'birefnet') {
+      sessionOptions.enableCpuMemArena = false;
+      sessionOptions.enableMemPattern = false;
+    }
+    try {
+      session = await ort.InferenceSession.create(modelUrl, sessionOptions);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const isOom = msg.includes('std::bad_alloc') || msg.includes('bad_alloc') || msg.includes('OOM') || msg.includes('out of memory');
+      if (prefersWebgpu && modelType === 'birefnet') {
+        try {
+          session = await ort.InferenceSession.create(modelUrl, {
+            executionProviders: ['wasm'],
+            graphOptimizationLevel: 'all',
+            enableCpuMemArena: false,
+            enableMemPattern: false
+          });
+        } catch (e2) {
+          const msg2 = e2 instanceof Error ? e2.message : String(e2);
+          const isOom2 = msg2.includes('std::bad_alloc') || msg2.includes('bad_alloc') || msg2.includes('OOM') || msg2.includes('out of memory');
+          if (isOom2) {
+            console.warn('BiRefNet session creation failed due to memory, falling back to RMBG-1.4');
+            session = await ort.InferenceSession.create(await getModelUrl('rmbg14'), {
+              executionProviders: ['wasm'],
+              graphOptimizationLevel: 'all'
+            });
+            loadedModelType = 'rmbg14';
+            return session;
+          }
+          throw e2;
+        }
+        loadedModelType = 'birefnet';
+        console.log('Model loaded successfully');
+        return session;
+      }
+      if (isOom && modelType === 'birefnet') {
+        console.warn('BiRefNet session creation failed due to memory, falling back to RMBG-1.4');
+        session = await ort.InferenceSession.create(await getModelUrl('rmbg14'), {
+          executionProviders: ['wasm'],
+          graphOptimizationLevel: 'all'
+        });
+        loadedModelType = 'rmbg14';
+        return session;
+      }
+      throw e;
+    }
     
     loadedModelType = modelType;
     console.log('Model loaded successfully');

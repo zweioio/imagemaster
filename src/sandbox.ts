@@ -357,29 +357,34 @@ ort.env.wasm.proxy = false;
 ort.env.wasm.simd = true; // 明确启用 SIMD (我们有 simd.wasm)
 
 let session: ort.InferenceSession | null = null;
-let loadedModelType: 'rmbg14' | 'u2net' | 'birefnet' | null = null; // 记录当前加载的模型类型
+let loadedModelType: 'rmbg14' | 'rmbg14_hq' | 'birefnet' | null = null; // 记录当前加载的模型类型
 let lastOutputTensor: ort.Tensor | null = null;
 let lastOriginalImage: HTMLImageElement | null = null;
 
-// 定义远程模型地址 (作为本地文件的备份)
-const REMOTE_MODELS = {
-    'u2net': 'https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx',
-    // 'rmbg14': '...' // RMBG-1.4 总是内置，不需要远程
-};
-
 // 获取模型路径 (支持本地优先，远程兜底)
-const getModelUrl = async (type: 'rmbg14' | 'u2net' | 'birefnet'): Promise<string> => {
+const getModelUrl = async (type: 'rmbg14' | 'rmbg14_hq' | 'birefnet'): Promise<string> => {
   const localFileName =
-    type === 'u2net'
-      ? 'u2net.onnx'
-      : type === 'birefnet'
+    type === 'birefnet'
         ? 'BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx'
-        : 'rmbg-1.4.onnx';
+        : type === 'rmbg14_hq'
+          ? 'rmbg-1.4-hq.onnx'
+          : 'rmbg-1.4.onnx';
   const localUrl = modelsDir + localFileName;
 
   // 对于 RMBG-1.4，总是使用本地文件
   if (type === 'rmbg14') {
       return localUrl;
+  }
+
+  if (type === 'rmbg14_hq') {
+    try {
+      const response = await fetch(localUrl, { method: 'HEAD' });
+      if (response.ok) {
+        return localUrl;
+      }
+    } catch (e) {
+    }
+    throw new Error('RMBG-1.4 Pro model file not found. Please put rmbg-1.4-hq.onnx into public/models/.');
   }
 
   if (type === 'birefnet') {
@@ -393,27 +398,11 @@ const getModelUrl = async (type: 'rmbg14' | 'u2net' | 'birefnet'): Promise<strin
     throw new Error('BiRefNet model file not found. Please put BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx into public/models/.');
   }
 
-  // 对于大模型 U2Net，检查本地是否存在
-  try {
-      const response = await fetch(localUrl, { method: 'HEAD' });
-      if (response.ok) {
-          console.log(`Sandbox: Found local model for ${type}`);
-          return localUrl;
-      }
-  } catch (e) {
-      console.warn(`Sandbox: Local model check failed for ${type}, trying remote...`);
-  }
-
-  // 本地不存在，使用远程 URL
-  console.log(`Sandbox: Local model missing, switching to remote download for ${type}`);
-  // 注意：直接返回 URL 给 onnxruntime 可能面临 CORS 问题，最好先下载为 Blob
-  // 但 onnxruntime-web 内部有 fetch 逻辑，我们可以先试着返回 URL
-  // 如果需要更稳健，可以先在此处 fetch 到 Blob
-  return REMOTE_MODELS[type];
+  throw new Error(`Unknown model type: ${type}`);
 };
 
 // 预加载模型
-async function loadModel(modelType: 'rmbg14' | 'u2net' | 'birefnet' = 'rmbg14') {
+async function loadModel(modelType: 'rmbg14' | 'rmbg14_hq' | 'birefnet' = 'rmbg14') {
   if (session && loadedModelType === modelType) {
     return session;
   }
@@ -496,7 +485,7 @@ async function loadModel(modelType: 'rmbg14' | 'u2net' | 'birefnet' = 'rmbg14') 
 }
 
 // 图像处理辅助函数
-async function processImage(imageFile: { arrayBuffer: ArrayBuffer, type: string }, modelType: 'rmbg14' | 'u2net' | 'birefnet'): Promise<{ original: HTMLImageElement, tensor: ort.Tensor }> {
+async function processImage(imageFile: { arrayBuffer: ArrayBuffer, type: string }, modelType: 'rmbg14' | 'rmbg14_hq' | 'birefnet'): Promise<{ original: HTMLImageElement, tensor: ort.Tensor }> {
   // 1. 加载图像
   const blob = new Blob([imageFile.arrayBuffer], { type: imageFile.type });
   const url = URL.createObjectURL(blob);
@@ -506,11 +495,6 @@ async function processImage(imageFile: { arrayBuffer: ArrayBuffer, type: string 
 
   let width = 1024;
   let height = 1024;
-  
-  if (modelType === 'u2net') {
-      width = 320;
-      height = 320;
-  }
 
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -524,7 +508,7 @@ async function processImage(imageFile: { arrayBuffer: ArrayBuffer, type: string 
 
   const float32Data = new Float32Array(3 * width * height);
 
-  if (modelType !== 'rmbg14') {
+  if (modelType === 'birefnet') {
       // U2Net Normalization (ImageNet)
       // mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
       const mean = [0.485, 0.456, 0.406];
@@ -556,15 +540,15 @@ async function processImage(imageFile: { arrayBuffer: ArrayBuffer, type: string 
 }
 
 // 应用抠图后处理
-const applyMatting = async (output: ort.Tensor, original: HTMLImageElement, modelType: 'rmbg14' | 'u2net' | 'birefnet' = 'rmbg14') => {
+const applyMatting = async (output: ort.Tensor, original: HTMLImageElement, modelType: 'rmbg14' | 'rmbg14_hq' | 'birefnet' = 'rmbg14') => {
   try {
     const maskData = output.data as Float32Array; 
     
     const dims = output.dims || [];
     const maybeH = dims.length >= 2 ? dims[dims.length - 2] : undefined;
     const maybeW = dims.length >= 1 ? dims[dims.length - 1] : undefined;
-    const maskHeight = typeof maybeH === 'number' ? maybeH : (modelType === 'u2net' ? 320 : 1024);
-    const maskWidth = typeof maybeW === 'number' ? maybeW : (modelType === 'u2net' ? 320 : 1024);
+    const maskHeight = typeof maybeH === 'number' ? maybeH : 1024;
+    const maskWidth = typeof maybeW === 'number' ? maybeW : 1024;
     
     const maskCanvas = document.createElement('canvas');
     maskCanvas.width = maskWidth;
@@ -880,7 +864,7 @@ window.addEventListener('message', async (event) => {
     // 2. Handle Normal Request (Requires imageFile)
     if (payload.imageFile) {
       try {
-        const requestedModel: 'rmbg14' | 'u2net' | 'birefnet' = payload.model || 'rmbg14';
+        const requestedModel: 'rmbg14' | 'rmbg14_hq' | 'birefnet' = payload.model || 'rmbg14';
 
         // 检查是否需要重新加载模型
         if (!session || loadedModelType !== requestedModel) {

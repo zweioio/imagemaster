@@ -87,7 +87,8 @@ const Sidebar = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sandboxIframeRef = useRef<HTMLIFrameElement>(null);
   const [mattingFormat, setMattingFormat] = useState<'image/png' | 'image/jpeg'>('image/png');
-  const [mattingModel, setMattingModel] = useState<'rmbg14' | 'u2net' | 'birefnet'>('rmbg14');
+  const [mattingModel, setMattingModel] = useState<'rmbg14' | 'rmbg14_hq' | 'birefnet'>('rmbg14');
+  const [hasBirefnetModel, setHasBirefnetModel] = useState<boolean>(false);
   const loadingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // 稿定风格配色常量
@@ -208,6 +209,17 @@ const Sidebar = () => {
     return () => {
       document.head.removeChild(style);
     };
+  }, []);
+
+  useEffect(() => {
+    try {
+      const url = chrome.runtime.getURL('models/BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx');
+      fetch(url, { method: 'HEAD' })
+        .then(r => setHasBirefnetModel(r.ok))
+        .catch(() => setHasBirefnetModel(false));
+    } catch (e) {
+      setHasBirefnetModel(false);
+    }
   }, []);
 
   const [isCancelled, setIsCancelled] = useState<boolean>(false);
@@ -1398,26 +1410,28 @@ const Sidebar = () => {
                        </div>
                        
                        <div style={{ display: 'flex', gap: '8px' }}>
-                      <button
-                        onClick={() => setMattingModel('birefnet')}
-                        style={{
-                          flex: 1,
-                          padding: '8px',
-                          borderRadius: '6px',
-                          border: `1px solid ${mattingModel === 'birefnet' ? COLORS.brand : '#d9d9d9'}`,
-                          backgroundColor: mattingModel === 'birefnet' ? '#e6f7ff' : '#fff',
-                          color: mattingModel === 'birefnet' ? COLORS.brand : COLORS.textMain,
-                          fontSize: '13px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '4px',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        <span style={{ fontWeight: 500 }}>BiRefNet</span>
-                      </button>
+                      {hasBirefnetModel && (
+                        <button
+                          onClick={() => setMattingModel('birefnet')}
+                          style={{
+                            flex: 1,
+                            padding: '8px',
+                            borderRadius: '6px',
+                            border: `1px solid ${mattingModel === 'birefnet' ? COLORS.brand : '#d9d9d9'}`,
+                            backgroundColor: mattingModel === 'birefnet' ? '#e6f7ff' : '#fff',
+                            color: mattingModel === 'birefnet' ? COLORS.brand : COLORS.textMain,
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          <span style={{ fontWeight: 500 }}>BiRefNet</span>
+                        </button>
+                      )}
                       <button
                         onClick={() => setMattingModel('rmbg14')}
                         style={{
@@ -1440,14 +1454,14 @@ const Sidebar = () => {
                       </button>
                       
                       <button
-                        onClick={() => setMattingModel('u2net')}
+                        onClick={() => setMattingModel('rmbg14_hq')}
                         style={{
                           flex: 1,
                           padding: '8px',
                           borderRadius: '6px',
-                          border: `1px solid ${mattingModel === 'u2net' ? COLORS.brand : '#d9d9d9'}`,
-                          backgroundColor: mattingModel === 'u2net' ? '#e6f7ff' : '#fff',
-                          color: mattingModel === 'u2net' ? COLORS.brand : COLORS.textMain,
+                          border: `1px solid ${mattingModel === 'rmbg14_hq' ? COLORS.brand : '#d9d9d9'}`,
+                          backgroundColor: mattingModel === 'rmbg14_hq' ? '#e6f7ff' : '#fff',
+                          color: mattingModel === 'rmbg14_hq' ? COLORS.brand : COLORS.textMain,
                           fontSize: '13px',
                           cursor: 'pointer',
                           display: 'flex',
@@ -1457,12 +1471,12 @@ const Sidebar = () => {
                           transition: 'all 0.2s'
                         }}
                       >
-                        <span style={{ fontWeight: 500 }}>U2Net</span>
+                        <span style={{ fontWeight: 500 }}>RMBG-1.4 Pro</span>
                       </button>
                     </div>
 
                     <div style={{ marginTop: '8px', fontSize: '11px', color: COLORS.textCaption }}>
-                        {mattingModel === 'birefnet' ? t.modelBirefnetDesc : (mattingModel === 'rmbg14' ? t.modelRmbgDesc : t.modelU2netDesc)}
+                        {mattingModel === 'birefnet' ? t.modelBirefnetDesc : (mattingModel === 'rmbg14' ? t.modelRmbgDesc : t.modelRmbgProDesc)}
                     </div>
                   </div>
                   

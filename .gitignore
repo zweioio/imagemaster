@@ -6,3 +6,5 @@ artifacts
 public/models/u2net.onnx
 imagemaster.zip
 public/models/BiRefNet*.onnx
+public/models/rmbg-1.4-hq.onnx
+public/models/model*.onnx

@@ -27,7 +27,7 @@ export default {
   batchMattingTooltip: "AI Matting supports single image only. Please switch to single mode.",
   
   // Tools
-  compressTool: "Compression",
+  compressTool: "Compression / Convert",
   mattingTool: "AI Matting",
   
   // Compression Settings
@@ -37,12 +37,13 @@ export default {
   qualitySize: "Size Priority: Small size, okay quality",
   qualityDeep: "Deep Compression: For preview, fair quality",
   qualityExtreme: "Extreme: Size only, poor quality",
-  startCompress: "Compress",
+  startCompress: "Process",
   startCompressAll: "Compress All",
   
   // Matting Settings
   aiModel: "AI Model",
   aiModelDesc: "Auto remove background",
+  aiModelHint: "Uses RMBG AI model: auto removes background, fast, natural edges.",
   modelRmbgDesc: "General / Fast: Good for most cases, fast speed.",
   modelRmbgProDesc: "High Quality / Slower: Better quality but uses more memory. May fail on low-memory devices.",
   modelU2netDesc: "High Precision: Large model (~170MB), slow first load. WiFi recommended.",

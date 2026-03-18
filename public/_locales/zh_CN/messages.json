@@ -1,10 +1,10 @@
 {
   "appName": {
-    "message": "图片编辑大师 - 免费使用，支持图片压缩、AI抠图、格式转换",
+    "message": "图片编辑大师 - 免费使用，支持图片压缩/格式转换、AI抠图",
     "description": "The name of the application"
   },
   "appDesc": {
-    "message": "免费且专业的图片处理处理工具，集成 \"图片压缩、AI抠图、格式转换\" 三大核心功能。批量处理、实时预览、本地运行",
+    "message": "免费且专业的图片处理处理工具，集成 \"图片压缩/格式转换、AI抠图\" 等核心功能。批量处理、实时预览、本地运行",
     "description": "The description of the application"
   },
   "contextMenuProcess": {

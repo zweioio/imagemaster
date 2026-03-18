@@ -1,10 +1,10 @@
 {
   "appName": {
-    "message": "ImageMaster - Free AI Background Remover, Compressor & Converter",
+    "message": "ImageMaster - Compressor/Converter & AI Background Remover",
     "description": "The name of the application"
   },
   "appDesc": {
-    "message": "Free image tool with 3 core functions: compression, AI matting, format conversion. Batch processing, real-time preview.",
+    "message": "Free image tool with compression/conversion and AI background removal. Batch processing, real-time preview.",
     "description": "The description of the application"
   },
   "contextMenuProcess": {

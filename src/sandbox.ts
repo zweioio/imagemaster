@@ -357,135 +357,62 @@ ort.env.wasm.proxy = false;
 ort.env.wasm.simd = true; // 明确启用 SIMD (我们有 simd.wasm)
 
 let session: ort.InferenceSession | null = null;
-let loadedModelType: 'rmbg14' | 'rmbg14_hq' | 'birefnet' | null = null; // 记录当前加载的模型类型
 let lastOutputTensor: ort.Tensor | null = null;
 let lastOriginalImage: HTMLImageElement | null = null;
 
-// 获取模型路径 (支持本地优先，远程兜底)
-const getModelUrl = async (type: 'rmbg14' | 'rmbg14_hq' | 'birefnet'): Promise<string> => {
-  const localFileName =
-    type === 'birefnet'
-        ? 'BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx'
-        : type === 'rmbg14_hq'
-          ? 'rmbg-1.4-hq.onnx'
-          : 'rmbg-1.4.onnx';
+// 获取模型路径
+const getModelUrl = async (): Promise<string> => {
+  const localFileName = 'rmbg-1.4-hq.onnx';
   const localUrl = modelsDir + localFileName;
 
-  // 对于 RMBG-1.4，总是使用本地文件
-  if (type === 'rmbg14') {
+  try {
+    const response = await fetch(localUrl, { method: 'HEAD' });
+    if (response.ok) {
       return localUrl;
-  }
-
-  if (type === 'rmbg14_hq') {
-    try {
-      const response = await fetch(localUrl, { method: 'HEAD' });
-      if (response.ok) {
-        return localUrl;
-      }
-    } catch (e) {
     }
-    throw new Error('RMBG-1.4 Pro model file not found. Please put rmbg-1.4-hq.onnx into public/models/.');
+  } catch (e) {
   }
-
-  if (type === 'birefnet') {
-    try {
-      const response = await fetch(localUrl, { method: 'HEAD' });
-      if (response.ok) {
-        return localUrl;
-      }
-    } catch (e) {
-    }
-    throw new Error('BiRefNet model file not found. Please put BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx into public/models/.');
-  }
-
-  throw new Error(`Unknown model type: ${type}`);
+  
+  throw new Error('RMBG-1.4 Pro model file (rmbg-1.4-hq.onnx) not found. Please verify public/models/.');
 };
 
 // 预加载模型
-async function loadModel(modelType: 'rmbg14' | 'rmbg14_hq' | 'birefnet' = 'rmbg14') {
-  if (session && loadedModelType === modelType) {
+async function loadModel() {
+  if (session) {
     return session;
   }
   
-  // Dispose previous session
-  if (session) {
-    try {
-      await session.release();
-    } catch (e) {
-      console.warn('Failed to release session:', e);
-    }
-    session = null;
-  }
-
   try {
-    // 动态获取模型 URL (本地或远程)
-    const modelUrl = await getModelUrl(modelType);
-    console.log(`Loading model: ${modelType} from ${modelUrl}`);
+    const modelUrl = await getModelUrl();
+    console.log(`Loading model from ${modelUrl}`);
     
     // Create new session
-    const prefersWebgpu = modelType === 'birefnet' && typeof (navigator as any).gpu !== 'undefined';
+    const prefersWebgpu = typeof (navigator as any).gpu !== 'undefined';
     const sessionOptions: any = {
       executionProviders: prefersWebgpu ? ['webgpu', 'wasm'] : ['wasm'],
       graphOptimizationLevel: 'all'
     };
-    if (modelType === 'birefnet') {
-      sessionOptions.enableCpuMemArena = false;
-      sessionOptions.enableMemPattern = false;
-    }
+
     try {
       session = await ort.InferenceSession.create(modelUrl, sessionOptions);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      const isOom = msg.includes('std::bad_alloc') || msg.includes('bad_alloc') || msg.includes('OOM') || msg.includes('out of memory');
-      if (prefersWebgpu && modelType === 'birefnet') {
-        try {
-          session = await ort.InferenceSession.create(modelUrl, {
-            executionProviders: ['wasm'],
-            graphOptimizationLevel: 'all',
-            enableCpuMemArena: false,
-            enableMemPattern: false
-          });
-        } catch (e2) {
-          const msg2 = e2 instanceof Error ? e2.message : String(e2);
-          const isOom2 = msg2.includes('std::bad_alloc') || msg2.includes('bad_alloc') || msg2.includes('OOM') || msg2.includes('out of memory');
-          if (isOom2) {
-            console.warn('BiRefNet session creation failed due to memory, falling back to RMBG-1.4');
-            session = await ort.InferenceSession.create(await getModelUrl('rmbg14'), {
-              executionProviders: ['wasm'],
-              graphOptimizationLevel: 'all'
-            });
-            loadedModelType = 'rmbg14';
-            return session;
-          }
-          throw e2;
-        }
-        loadedModelType = 'birefnet';
-        console.log('Model loaded successfully');
-        return session;
-      }
-      if (isOom && modelType === 'birefnet') {
-        console.warn('BiRefNet session creation failed due to memory, falling back to RMBG-1.4');
-        session = await ort.InferenceSession.create(await getModelUrl('rmbg14'), {
+       console.warn('Session creation failed with preferred options, falling back to WASM only', e);
+       session = await ort.InferenceSession.create(modelUrl, {
           executionProviders: ['wasm'],
           graphOptimizationLevel: 'all'
-        });
-        loadedModelType = 'rmbg14';
-        return session;
-      }
-      throw e;
+       });
     }
     
-    loadedModelType = modelType;
     console.log('Model loaded successfully');
     return session;
   } catch (e) {
-    console.error(`Failed to load model ${modelType}:`, e);
+    console.error(`Failed to load model:`, e);
     throw e;
   }
 }
 
 // 图像处理辅助函数
-async function processImage(imageFile: { arrayBuffer: ArrayBuffer, type: string }, modelType: 'rmbg14' | 'rmbg14_hq' | 'birefnet'): Promise<{ original: HTMLImageElement, tensor: ort.Tensor }> {
+async function processImage(imageFile: { arrayBuffer: ArrayBuffer, type: string }): Promise<{ original: HTMLImageElement, tensor: ort.Tensor }> {
   // 1. 加载图像
   const blob = new Blob([imageFile.arrayBuffer], { type: imageFile.type });
   const url = URL.createObjectURL(blob);
@@ -508,31 +435,15 @@ async function processImage(imageFile: { arrayBuffer: ArrayBuffer, type: string 
 
   const float32Data = new Float32Array(3 * width * height);
 
-  if (modelType === 'birefnet') {
-      // U2Net Normalization (ImageNet)
-      // mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-      const mean = [0.485, 0.456, 0.406];
-      const std = [0.229, 0.224, 0.225];
-      
-      for (let i = 0; i < width * height; i++) {
-        // R
-        float32Data[i] = ((data[i * 4] / 255.0) - mean[0]) / std[0];
-        // G
-        float32Data[width * height + i] = ((data[i * 4 + 1] / 255.0) - mean[1]) / std[1];
-        // B
-        float32Data[2 * width * height + i] = ((data[i * 4 + 2] / 255.0) - mean[2]) / std[2];
-      }
-  } else {
-      // RMBG-1.4 Normalization
-      // mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]
-      const mean = [0.5, 0.5, 0.5];
-      const std = [0.5, 0.5, 0.5];
+  // RMBG-1.4 Normalization
+  // mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]
+  const mean = [0.5, 0.5, 0.5];
+  const std = [0.5, 0.5, 0.5];
 
-      for (let i = 0; i < width * height; i++) {
-        float32Data[i] = ((data[i * 4] / 255.0) - mean[0]) / std[0];
-        float32Data[width * height + i] = ((data[i * 4 + 1] / 255.0) - mean[1]) / std[1];
-        float32Data[2 * width * height + i] = ((data[i * 4 + 2] / 255.0) - mean[2]) / std[2];
-      }
+  for (let i = 0; i < width * height; i++) {
+    float32Data[i] = ((data[i * 4] / 255.0) - mean[0]) / std[0];
+    float32Data[width * height + i] = ((data[i * 4 + 1] / 255.0) - mean[1]) / std[1];
+    float32Data[2 * width * height + i] = ((data[i * 4 + 2] / 255.0) - mean[2]) / std[2];
   }
 
   const tensor = new ort.Tensor('float32', float32Data, [1, 3, height, width]);
@@ -540,7 +451,7 @@ async function processImage(imageFile: { arrayBuffer: ArrayBuffer, type: string 
 }
 
 // 应用抠图后处理
-const applyMatting = async (output: ort.Tensor, original: HTMLImageElement, modelType: 'rmbg14' | 'rmbg14_hq' | 'birefnet' = 'rmbg14') => {
+const applyMatting = async (output: ort.Tensor, original: HTMLImageElement) => {
   try {
     const maskData = output.data as Float32Array; 
     
@@ -576,27 +487,8 @@ const applyMatting = async (output: ort.Tensor, original: HTMLImageElement, mode
         if (needsSigmoid) {
             val = 1 / (1 + Math.exp(-val));
         }
-        
-        // Refined Thresholding logic
-        if (modelType === 'rmbg14') {
-             // RMBG 1.4: Aggressive noise suppression
-             // Any low probability (< 10%) is forced to 0 (Transparent)
-             // Any high probability (> 90%) is forced to 1 (Opaque)
-             // This removes "gray/blue noise" in background
-             if (val < 0.10) val = 0;
-             else if (val > 0.90) val = 1;
-             else {
-                // Smooth transition for edges (0.1 - 0.9) -> (0 - 1)
-                val = (val - 0.10) / 0.80; 
-             }
-        } else {
-            // U2Net Logic - Standard Thresholding
-            // U2Net is generally robust, but standard thresholding helps reduce halo
-            // Use standard thresholding instead of complex contrast enhancement
-            // This is closer to "Official Default" behavior
-            if (val < 0.1) val = 0;
-            else if (val > 0.9) val = 1;
-        }
+        if (val < 0) val = 0;
+        else if (val > 1) val = 1;
         
         // Simple mapping
         let alpha = Math.round(val * 255);
@@ -633,110 +525,11 @@ const applyMatting = async (output: ort.Tensor, original: HTMLImageElement, mode
     tempCtx.imageSmoothingQuality = 'high';
     tempCtx.drawImage(maskCanvas, 0, 0, original.width, original.height);
     
-    // 2. Composite
-    // Apply morphological erosion ONLY for RMBG to clean up artifacts
-    // U2Net should use standard masking to avoid edge blur
+    finalCtx.globalCompositeOperation = 'source-over';
+    finalCtx.drawImage(original, 0, 0);
     
-    if (modelType === 'rmbg14') {
-        // Always use erosion canvas for better quality
-        const erodedMaskCanvas = document.createElement('canvas');
-        erodedMaskCanvas.width = original.width;
-        erodedMaskCanvas.height = original.height;
-        const erodedCtx = erodedMaskCanvas.getContext('2d');
-        if (!erodedCtx) throw new Error('Eroded context unavailable');
-        
-        // Draw initial mask
-        erodedCtx.drawImage(tempMaskCanvas, 0, 0);
-        
-        // Perform Erosion (Shrink mask slightly to remove noise)
-        const w = original.width;
-        const h = original.height;
-        const sourceImageData = tempCtx.getImageData(0, 0, w, h);
-        const srcData = sourceImageData.data;
-        
-        const targetImageData = erodedCtx.createImageData(w, h);
-        const targetData = targetImageData.data;
-
-        // Kernel size: 1 means 3x3 window. 
-        // We check neighbors. If any neighbor is 0 (transparent), we reduce our alpha.
-        // This effectively "erodes" the white mask.
-        
-        for (let y = 0; y < h; y++) {
-            for (let x = 0; x < w; x++) {
-                const idx = (y * w + x) * 4;
-                // Border pixels always transparent
-                if (y === 0 || y === h - 1 || x === 0 || x === w - 1) {
-                    targetData[idx + 3] = 0;
-                    continue;
-                }
-                
-                const currentAlpha = srcData[idx + 3];
-                
-                if (currentAlpha > 0) {
-                    // Check 4-connected neighbors (Top, Bottom, Left, Right)
-                    const up = srcData[((y - 1) * w + x) * 4 + 3];
-                    const down = srcData[((y + 1) * w + x) * 4 + 3];
-                    const left = srcData[(y * w + (x - 1)) * 4 + 3];
-                    const right = srcData[(y * w + (x + 1)) * 4 + 3];
-                    
-                    let newAlpha = currentAlpha;
-
-                     // RMBG 1.4: "Smart Edge Recovery"
-                     // 1. If we are deep inside the object (surrounded by high alpha), keep it solid (255)
-                     // 2. If we are at the edge, apply soft erosion to kill noise but keep hair
-                     
-                     const minNeighbor = Math.min(up, down, left, right);
-                     
-                     if (minNeighbor > 200) {
-                         // Solid interior, keep it crisp
-                         newAlpha = 255;
-                     } else {
-                         // Edge region:
-                         // Feathering: Take average of neighbors to smooth out single-pixel noise
-                         // Use weighted average to prioritize current pixel but blend with neighbors
-                         const avg = (up + down + left + right + currentAlpha * 4) / 8;
-                         
-                         // Alpha Matting Heuristic:
-                         // If it's a weak signal (noise), kill it aggressively.
-                         if (avg < 20) {
-                             newAlpha = 0; 
-                         } else {
-                             // Smooth edge, but maintain structure
-                             newAlpha = avg; 
-                         }
-                     }
-                    
-                    targetData[idx] = srcData[idx];
-                    targetData[idx + 1] = srcData[idx + 1];
-                    targetData[idx + 2] = srcData[idx + 2];
-                    targetData[idx + 3] = newAlpha;
-                } else {
-                    targetData[idx + 3] = 0;
-                }
-            }
-        }
-        
-        erodedCtx.putImageData(targetImageData, 0, 0);
-        
-        // Final Composition using Eroded Mask
-        finalCtx.globalCompositeOperation = 'source-over';
-        finalCtx.drawImage(original, 0, 0);
-        
-        finalCtx.globalCompositeOperation = 'destination-in';
-        finalCtx.drawImage(erodedMaskCanvas, 0, 0);
-        
-    } else {
-        // U2Net: Direct Masking (Official Style)
-        // No erosion, no complex contrast enhancement.
-        // Just use the resized mask directly to preserve edge details.
-        
-        finalCtx.globalCompositeOperation = 'source-over';
-        finalCtx.drawImage(original, 0, 0);
-        
-        finalCtx.globalCompositeOperation = 'destination-in';
-        // Use the high-quality scaled mask directly
-        finalCtx.drawImage(tempMaskCanvas, 0, 0);
-    }
+    finalCtx.globalCompositeOperation = 'destination-in';
+    finalCtx.drawImage(tempMaskCanvas, 0, 0);
     
     finalCtx.globalCompositeOperation = 'source-over';
     
@@ -767,15 +560,8 @@ window.addEventListener('message', async (event) => {
   if (type === 'MATTING_PRELOAD') {
     try {
       if (!session) {
-        // Switch to rmbg14 for better artifact handling
-        const defaultModel = 'rmbg14';
-        console.log(`Sandbox: Preloading ${defaultModel} model...`);
-        const modelUrl = await getModelUrl(defaultModel);
-        console.log('Sandbox: Model URL:', modelUrl);
-        session = await ort.InferenceSession.create(modelUrl, {
-          executionProviders: ['wasm'], 
-        });
-        loadedModelType = defaultModel;
+        console.log(`Sandbox: Preloading model...`);
+        await loadModel();
       }
       console.log('Sandbox: Model loaded.');
       window.parent.postMessage({ type: 'MATTING_PRELOAD_DONE' }, '*');
@@ -833,7 +619,6 @@ window.addEventListener('message', async (event) => {
     return;
   }
 
-
   if (type === 'MATTING_REQUEST') {
     // Check payload
     if (!payload) return;
@@ -850,7 +635,7 @@ window.addEventListener('message', async (event) => {
         try {
              // Skip inference, just re-apply matting with new format
              window.parent.postMessage({ type: 'MATTING_PROGRESS', payload: { progress: 90 } }, '*');
-             applyMatting(lastOutputTensor, lastOriginalImage, loadedModelType!);
+             applyMatting(lastOutputTensor, lastOriginalImage);
         } catch(e) { 
              console.error('Conversion error:', e);
              window.parent.postMessage({
@@ -864,21 +649,10 @@ window.addEventListener('message', async (event) => {
     // 2. Handle Normal Request (Requires imageFile)
     if (payload.imageFile) {
       try {
-        const requestedModel: 'rmbg14' | 'rmbg14_hq' | 'birefnet' = payload.model || 'rmbg14';
-
         // 检查是否需要重新加载模型
-        if (!session || loadedModelType !== requestedModel) {
+        if (!session) {
             window.parent.postMessage({ type: 'MATTING_PROGRESS', payload: { progress: 10 } }, '*');
-            
-            if (session) {
-                // Release old session if needed (though ort.js handles this mostly)
-                session = null;
-            }
-            
-            console.log(`Sandbox: Switching model to ${requestedModel}...`);
-
-            session = await loadModel(requestedModel);
-            loadedModelType = requestedModel;
+            session = await loadModel();
         }
 
         window.parent.postMessage({ type: 'MATTING_PROGRESS', payload: { progress: 30 } }, '*');
@@ -886,7 +660,7 @@ window.addEventListener('message', async (event) => {
         // Ensure image processing doesn't block immediately
         await new Promise(resolve => setTimeout(resolve, 50)); 
         
-        const { original, tensor } = await processImage(payload.imageFile, loadedModelType!);
+        const { original, tensor } = await processImage(payload.imageFile);
         lastOriginalImage = original; // 保存原图用于后续调整
 
         window.parent.postMessage({ type: 'MATTING_PROGRESS', payload: { progress: 50 } }, '*');
@@ -901,18 +675,7 @@ window.addEventListener('message', async (event) => {
         try {
           results = await session.run(feeds);
         } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          const isOom = msg.includes('std::bad_alloc') || msg.includes('bad_alloc') || msg.includes('OOM') || msg.includes('out of memory');
-          if (isOom && loadedModelType === 'birefnet') {
-            loadedModelType = 'rmbg14';
-            session = await loadModel('rmbg14');
-            const fallbackInput = await processImage(payload.imageFile, 'rmbg14');
-            const fallbackFeeds = { [session.inputNames[0]]: fallbackInput.tensor };
-            const fallback = await session.run(fallbackFeeds);
-            results = fallback;
-          } else {
             throw e;
-          }
         }
         const output = results[session.outputNames[0]];
         lastOutputTensor = output; // 保存推理结果
@@ -923,7 +686,7 @@ window.addEventListener('message', async (event) => {
         await new Promise(resolve => setTimeout(resolve, 50));
 
         // 默认阈值 0.5 (Not used anymore in signature)
-        await applyMatting(output, lastOriginalImage!, loadedModelType!);
+        await applyMatting(output, lastOriginalImage!);
         
         // applyMatting sends the final result message which implies 100%
 

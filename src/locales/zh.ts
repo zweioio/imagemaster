@@ -27,22 +27,23 @@ export default {
   batchMattingTooltip: "批量模式下暂不支持 AI 抠图，请切换到单张模式",
   
   // Tools
-  compressTool: "图片压缩",
+  compressTool: "图片压缩 / 格式转换",
   mattingTool: "AI 抠图",
   
   // Compression Settings
-  compressQuality: "压缩质量",
+  compressQuality: "品质",
   qualityHigh: "画质优先：肉眼无损，保留细节",
   qualityBalanced: "平衡推荐：最佳平衡，体积减半",
   qualitySize: "体积优先：体积超小，画质尚可",
   qualityDeep: "深度压缩：适合预览，画质一般",
   qualityExtreme: "极限压缩：仅关注体积，画质较差",
-  startCompress: "开始压缩",
+  startCompress: "开始处理",
   startCompressAll: "开始压缩所有图片",
   
   // Matting Settings
   aiModel: "AI 模型",
   aiModelDesc: "自动识别主体并去除背景",
+  aiModelHint: "使用 RMBG AI 模型，自动识别主体并去除背景，适合大多数场景，速度快，边缘处理自然",
   modelRmbgDesc: "通用 / 快速：适合大多数场景，速度快，边缘处理自然，适合简单场景",
   modelRmbgProDesc: "高质量 / 更慢：更高精度模型，效果更好但更吃内存，低配置设备可能失败。",
   modelU2netDesc: "高精度 / 大模型：U2Net 模型较大 (约170MB)，首次加载慢，细节更丰富。建议在 Wi-Fi 下使用",

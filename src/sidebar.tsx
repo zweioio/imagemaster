@@ -87,8 +87,7 @@ const Sidebar = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sandboxIframeRef = useRef<HTMLIFrameElement>(null);
   const [mattingFormat, setMattingFormat] = useState<'image/png' | 'image/jpeg'>('image/png');
-  const [mattingModel, setMattingModel] = useState<'rmbg14' | 'rmbg14_hq' | 'birefnet'>('rmbg14');
-  const [hasBirefnetModel, setHasBirefnetModel] = useState<boolean>(false);
+  // 移除多模型状态，仅保留单模型逻辑
   const loadingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // 稿定风格配色常量
@@ -105,7 +104,6 @@ const Sidebar = () => {
     purple: '#6f42c1'
   };
 
-  // 注入旋转动画和全局样式
   useEffect(() => {
     const style = document.createElement('style');
     style.innerHTML = `
@@ -211,16 +209,7 @@ const Sidebar = () => {
     };
   }, []);
 
-  useEffect(() => {
-    try {
-      const url = chrome.runtime.getURL('models/BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx');
-      fetch(url, { method: 'HEAD' })
-        .then(r => setHasBirefnetModel(r.ok))
-        .catch(() => setHasBirefnetModel(false));
-    } catch (e) {
-      setHasBirefnetModel(false);
-    }
-  }, []);
+  // 移除 BiRefNet 检测逻辑
 
   const [isCancelled, setIsCancelled] = useState<boolean>(false);
 
@@ -705,7 +694,6 @@ const Sidebar = () => {
                     size: currentFile.size,
                     arrayBuffer: e.target.result
                   },
-                  model: mattingModel,
                   outputFormat: mattingFormat
                 }
               }, '*');
@@ -1049,7 +1037,11 @@ const Sidebar = () => {
           transition: 'background-color 0.2s, border-color 0.2s',
           /* 移除 transition: all，让清空操作瞬间完成，不再产生背景色渐变的残影 */
         }}
-        onClick={() => !previewUrl && fileInputRef.current?.click()}
+        onClick={(e) => {
+          if (!previewUrl && e.target === e.currentTarget) {
+            fileInputRef.current?.click();
+          }
+        }}
       >
         {!previewUrl && (
           <div style={{
@@ -1257,6 +1249,10 @@ const Sidebar = () => {
           <div style={{ textAlign: 'center', padding: '40px' }}>
             <div 
                className="gaoding-btn gaoding-btn-primary" 
+               onClick={(e) => {
+                 e.stopPropagation();
+                 fileInputRef.current?.click();
+               }}
                style={{ 
                  width: '80%', 
                  padding: '12px',
@@ -1264,7 +1260,8 @@ const Sidebar = () => {
                  borderRadius: '8px', 
                  margin: '0 auto 20px', 
                  fontSize: '15px',
-                 boxSizing: 'border-box'
+                 boxSizing: 'border-box',
+                 cursor: 'pointer'
                }}
              >
                <Upload size={20} />
@@ -1281,16 +1278,17 @@ const Sidebar = () => {
             <div style={{ fontSize: '13px', color: COLORS.textCaption }}>{t.supportFormats}</div>
           </div>
         )}
-        <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept="image/*" multiple onChange={handleFileChange} />
-        <iframe 
-          ref={sandboxIframeRef} 
-          src={chrome.runtime.getURL('sandbox.html')} 
-          style={{ display: 'none' }} 
-          // 显式赋予权限以启用 Cache Storage 和 WebGPU
-          sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-          onLoad={preloadModels}
-        />
       </div>
+
+      <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept="image/*" multiple onChange={handleFileChange} />
+      <iframe 
+        ref={sandboxIframeRef} 
+        src={chrome.runtime.getURL('sandbox.html')} 
+        style={{ display: 'none' }} 
+        // 显式赋予权限以启用 Cache Storage 和 WebGPU
+        sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+        onLoad={preloadModels}
+      />
 
       {/* Image Info */}
       {imageInfo && (
@@ -1398,89 +1396,17 @@ const Sidebar = () => {
 
             {activeTool === 'matting' && originalFiles.length === 1 && (
                 <div className="gaoding-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {/* AI Model Selection */}
-                  <div>
-                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                       <label style={{ fontSize: '14px', fontWeight: 600, color: COLORS.textMain, display: 'flex', alignItems: 'center' }}>
-                         {t.aiModel}
-                       </label>
-                       <div style={{ fontSize: '14px', color: COLORS.textCaption }}>
-                          {t.aiModelDesc}
-                        </div>
-                       </div>
-                       
-                       <div style={{ display: 'flex', gap: '8px' }}>
-                      {hasBirefnetModel && (
-                        <button
-                          onClick={() => setMattingModel('birefnet')}
-                          style={{
-                            flex: 1,
-                            padding: '8px',
-                            borderRadius: '6px',
-                            border: `1px solid ${mattingModel === 'birefnet' ? COLORS.brand : '#d9d9d9'}`,
-                            backgroundColor: mattingModel === 'birefnet' ? '#e6f7ff' : '#fff',
-                            color: mattingModel === 'birefnet' ? COLORS.brand : COLORS.textMain,
-                            fontSize: '13px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '4px',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          <span style={{ fontWeight: 500 }}>BiRefNet</span>
-                        </button>
-                      )}
-                      <button
-                        onClick={() => setMattingModel('rmbg14')}
-                        style={{
-                          flex: 1,
-                          padding: '8px',
-                          borderRadius: '6px',
-                          border: `1px solid ${mattingModel === 'rmbg14' ? COLORS.brand : '#d9d9d9'}`,
-                          backgroundColor: mattingModel === 'rmbg14' ? '#e6f7ff' : '#fff',
-                          color: mattingModel === 'rmbg14' ? COLORS.brand : COLORS.textMain,
-                          fontSize: '13px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '4px',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        <span style={{ fontWeight: 500 }}>RMBG-1.4</span>
-                      </button>
-                      
-                      <button
-                        onClick={() => setMattingModel('rmbg14_hq')}
-                        style={{
-                          flex: 1,
-                          padding: '8px',
-                          borderRadius: '6px',
-                          border: `1px solid ${mattingModel === 'rmbg14_hq' ? COLORS.brand : '#d9d9d9'}`,
-                          backgroundColor: mattingModel === 'rmbg14_hq' ? '#e6f7ff' : '#fff',
-                          color: mattingModel === 'rmbg14_hq' ? COLORS.brand : COLORS.textMain,
-                          fontSize: '13px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '4px',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        <span style={{ fontWeight: 500 }}>RMBG-1.4 Pro</span>
-                      </button>
-                    </div>
-
-                    <div style={{ marginTop: '8px', fontSize: '11px', color: COLORS.textCaption }}>
-                        {mattingModel === 'birefnet' ? t.modelBirefnetDesc : (mattingModel === 'rmbg14' ? t.modelRmbgDesc : t.modelRmbgProDesc)}
-                    </div>
-                  </div>
+                  {/* AI Model Selection Removed - Using RMBG-1.4 Pro by default */}
                   
                   {/* Format selection moved to result view */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '14px', fontWeight: 600 }}>{t.aiModel}</span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: COLORS.textCaption, marginTop: '8px' }}>
+                      {t.aiModelHint}
+                    </div>
+                  </div>
 
                   <button 
                     onClick={() => startProcessing('matting')} 

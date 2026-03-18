@@ -1,6 +1,6 @@
 {
   "name": "imagemaster",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "免费且专业的图片处理处理工具，集成 \"图片压缩、AI抠图、格式转换\" 三大核心功能。批量处理、实时预览、本地运行",
   "private": true,
   "scripts": {
